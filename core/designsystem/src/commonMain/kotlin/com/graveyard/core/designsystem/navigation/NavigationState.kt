@@ -66,8 +66,14 @@ class NavigationState(
 
     val currentKey: NavKey by derivedStateOf { currentSubStack.last() }
 
+    /**
+     * 当前子栈是否还有可以返回的页面。
+     *
+     * 顶层路由之间的切换不属于系统返回行为，因此不能用 [startKey]
+     * 判断这里是否可返回。
+     */
     val canGoBack: Boolean
-        get() = currentKey != startKey
+        get() = currentSubStack.size > 1
 }
 
 /**

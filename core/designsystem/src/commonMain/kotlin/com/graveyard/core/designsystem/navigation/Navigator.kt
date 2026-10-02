@@ -29,13 +29,7 @@ class Navigator(val state: NavigationState) {
     fun goBack() {
         if (!state.canGoBack) return
 
-        when (state.currentKey) {
-            state.currentTopLevelKey -> {
-                // 当前位于当前子栈的底部，因此回退到上一个顶层栈。
-                state.topLevelStack.removeLastOrNull()
-            }
-            else -> state.currentSubStack.removeLastOrNull()
-        }
+        state.currentSubStack.removeLastOrNull()
     }
 
     /**

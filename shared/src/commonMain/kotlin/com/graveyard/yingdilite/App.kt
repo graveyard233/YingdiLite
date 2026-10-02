@@ -10,7 +10,9 @@ import org.koin.dsl.koinConfiguration
 
 @Composable
 @Preview
-fun App() {
+fun App(
+    onExit: (() -> Unit)? = null,
+) {
     val darkTheme = isSystemInDarkTheme()
 
     KoinApplication(
@@ -19,7 +21,10 @@ fun App() {
         },
     ) {
         AppTheme(darkTheme = darkTheme) {
-            AppNavigation(darkTheme = darkTheme)
+            AppNavigation(
+                darkTheme = darkTheme,
+                onExit = onExit,
+            )
         }
     }
 }

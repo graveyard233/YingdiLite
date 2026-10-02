@@ -3,9 +3,20 @@ package com.graveyard.yingdilite.navigation
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.NavDisplay
@@ -30,6 +41,8 @@ import com.graveyard.feature.news.navigation.NewsChildRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.feature.news.ui.NewsChildScreen
 import com.graveyard.feature.news.ui.NewsScreen
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -51,6 +64,7 @@ private val hiddenBottomBarRoutes = setOf<NavKey>(
 @Composable
 fun AppNavigation(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    onExit: (() -> Unit)? = null,
 ) {
     val configuration = remember {
         SavedStateConfiguration {
@@ -75,13 +89,61 @@ fun AppNavigation(
         topLevelKeys = topLevelKeys,
     )
     val navigator = remember(navigationState) { Navigator(navigationState) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var rootBackPromptVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(rootBackPromptVisible) {
+        if (rootBackPromptVisible) {
+            delay(ROOT_BACK_CONFIRMATION_WINDOW_MILLIS)
+            rootBackPromptVisible = false
+        }
+    }
+
+    // 路由变化后开始新的返回流程，不能继承之前根页面的确认状态。
+    LaunchedEffect(navigationState.currentKey) {
+        rootBackPromptVisible = false
+    }
+
+    fun handleBack() {
+        if (navigationState.canGoBack) {
+            rootBackPromptVisible = false
+            navigator.goBack()
+            return
+        }
+
+        // iOS 没有 Android 式的系统返回退出行为，因此根节点不显示退出提示。
+        if (onExit == null) return
+
+        if (rootBackPromptVisible) {
+            rootBackPromptVisible = false
+            onExit.invoke()
+            return
+        }
+
+        rootBackPromptVisible = true
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(
+                message = "再按一次退出应用",
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
+
     val entries = navigationState.toEntries { key ->
         NavEntry(key) {
             AppNavEntry(key = key, navigator = navigator)
         }
     }
 
+    val appBackHandlerState = rememberNavigationEventState(
+        currentInfo = AppNavigationEventInfo,
+        backInfo = listOf(AppNavigationEventInfo),
+        forwardInfo = emptyList(),
+    )
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (navigationState.currentKey !in hiddenBottomBarRoutes) {
                 AppBottomBar(
@@ -95,11 +157,23 @@ fun AppNavigation(
     ) { paddingValues ->
         NavDisplay(
             entries = entries,
-            onBack = navigator::goBack,
+            onBack = ::handleBack,
             modifier = Modifier.padding(paddingValues),
         )
+        if (onExit != null) {
+            NavigationBackHandler(
+                state = appBackHandlerState,
+                isBackEnabled = true,
+                onBackCancelled = {},
+                onBackCompleted = ::handleBack,
+            )
+        }
     }
 }
+
+private const val ROOT_BACK_CONFIRMATION_WINDOW_MILLIS = 2_000L
+
+private object AppNavigationEventInfo : NavigationEventInfo()
 
 @Composable
 private fun AppNavEntry(
