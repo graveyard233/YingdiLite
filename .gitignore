@@ -19,3 +19,8 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 .docs/
+
+/core/data/src/commonMain/kotlin/com/graveyard/core/data/crypto/
+
+# DSH 沙箱排查文件权限时产生的临时记录
+/.acl-recovery/

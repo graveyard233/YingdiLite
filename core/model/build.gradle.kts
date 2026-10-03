@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.android.lint)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {
@@ -56,7 +57,8 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.kotlin.stdlib)
-                // Add KMP dependencies here
+                // 接口数据模型需要序列化注解与 Json 解析能力
+                api(libs.kotlinx.serialization.json)
             }
         }
     }
