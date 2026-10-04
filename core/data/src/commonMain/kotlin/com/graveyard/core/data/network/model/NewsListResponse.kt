@@ -1,4 +1,4 @@
-package com.graveyard.core.model.news
+package com.graveyard.core.data.network.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  * 对应 feed 列表接口返回的 `{ "version": ..., "list": [...] }` 结构。
  */
 @Serializable
-data class NewsListResponse(
+internal data class NewsListResponse(
     val version: Long = 0L,
     val list: List<NewsListItem> = emptyList(),
 )
@@ -18,7 +18,7 @@ data class NewsListResponse(
  * 新闻列表中的一项，包含发布者和文章内容。
  */
 @Serializable
-data class NewsListItem(
+internal data class NewsListItem(
     val author: NewsAuthor = NewsAuthor(),
     val feed: NewsFeed = NewsFeed(),
 )
@@ -27,7 +27,7 @@ data class NewsListItem(
  * 新闻作者信息。
  */
 @Serializable
-data class NewsAuthor(
+internal data class NewsAuthor(
     val id: Long = 0L,
     val username: String = "",
     val head: String = "",
@@ -43,7 +43,7 @@ data class NewsAuthor(
  * 在接口中是 JSON 字符串，因此这里保留为 String，交由业务层按需二次解析。
  */
 @Serializable
-data class NewsFeed(
+internal data class NewsFeed(
     val id: Long = 0L,
     val title: String = "",
     val content: String = "",

@@ -69,7 +69,9 @@ kotlin {
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.logging)
 
-                implementation(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.coroutines.core)
+
+                api(libs.androidx.paging.common)
             }
         }
 

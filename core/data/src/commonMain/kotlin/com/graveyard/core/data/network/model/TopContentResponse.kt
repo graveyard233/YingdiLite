@@ -1,4 +1,4 @@
-package com.graveyard.core.model.news
+package com.graveyard.core.data.network.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * 解析时请使用 `Json { ignoreUnknownKeys = true }`，否则该字段会导致解析失败。
  */
 @Serializable
-data class TopContentResponse(
+internal data class TopContentResponse(
     @SerialName("top_content")
     val topContent: List<BannerItem> = emptyList(),
 )
@@ -19,7 +19,7 @@ data class TopContentResponse(
  * 顶部运营位（banner）条目，对应响应中的 `top_content` 数组元素。
  */
 @Serializable
-data class BannerItem(
+internal data class BannerItem(
     /** 运营位 id，如 `2749`。 */
     @SerialName("ad_id")
     val adId: Long = 0L,

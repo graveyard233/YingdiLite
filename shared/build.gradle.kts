@@ -82,6 +82,7 @@ kotlin {
             implementation(libs.androidx.sqlite.bundled)
 
             implementation(project(":core:designsystem"))
+            implementation(project(":core:data"))
 
             implementation(project(":feature:news"))
             implementation(project(":feature:community"))
