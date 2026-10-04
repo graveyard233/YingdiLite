@@ -15,6 +15,8 @@ internal class NewsPagingSource(
     private val tagId: Int,
     private val pageSize: Int,
 ) : PagingSource<Int, NewsArticle>() {
+    private var version: Long = 0L
+
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, NewsArticle> {
         val page = params.key ?: 1
 
@@ -24,7 +26,9 @@ internal class NewsPagingSource(
                 page = page,
                 size = pageSize,
                 tagId = tagId,
+                version = if (page == 1) 0L else version,
             )
+            version = response.version
             LoadResult.Page(
                 data = response.list.map { it.toNewsArticle() },
                 prevKey = if (page == 1) null else page - 1,
@@ -39,8 +43,7 @@ internal class NewsPagingSource(
     }
 
     override fun getRefreshKey(state: PagingState<Int, NewsArticle>): Int? {
-        val anchorPosition = state.anchorPosition ?: return null
-        val page = state.closestPageToPosition(anchorPosition) ?: return null
-        return page.prevKey?.plus(1) ?: page.nextKey?.minus(1)
+        // A new source must fetch page 1 to obtain a version before loading later pages.
+        return null
     }
 }

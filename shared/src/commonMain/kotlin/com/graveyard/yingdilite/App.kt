@@ -15,12 +15,13 @@ import org.koin.dsl.koinConfiguration
 @Preview
 fun App(
     onExit: (() -> Unit)? = null,
+    enableNetworkDiagnosticBodies: Boolean = false,
 ) {
     val darkTheme = isSystemInDarkTheme()
 
     KoinApplication(
         configuration = koinConfiguration {
-            modules(networkModule, repositoryModule, newsModule)
+            modules(networkModule(enableNetworkDiagnosticBodies), repositoryModule, newsModule)
         },
     ) {
         AppTheme(darkTheme = darkTheme) {

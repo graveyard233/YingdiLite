@@ -34,10 +34,10 @@ internal class YingdiNetData(
 
     /** @param tagId 标签 id，例如首页运营位用 `99`。 */
     override suspend fun getBannerList(tagId: Int): TopContentResponse {
-        val response = client.post("$commonBaseUrl/web/feed/top-content") {
+        val url = "$commonBaseUrl/web/feed/top-content"
+        val response = client.post(url) {
             setBody(YingdiSignedForm.of("tag_id" to tagId.toString()))
         }
-
         return response.decodeResponse(expectedArrayField = "top_content")
     }
 
@@ -45,17 +45,19 @@ internal class YingdiNetData(
         page: Int,
         size: Int,
         tagId: Int,
+        version: Long,
     ): NewsListResponse {
-        val response = client.post("$commonBaseUrl/web/feed/tag-content-list") {
+        val url = "$commonBaseUrl/web/feed/tag-content-list"
+        val response = client.post(url) {
             setBody(
                 YingdiSignedForm.of(
                     "tag_id" to tagId.toString(),
                     "size" to size.toString(),
                     "page" to page.toString(),
+                    "version" to version.toString(),
                 ),
             )
         }
-
         return response.decodeResponse(expectedArrayField = "list")
     }
 

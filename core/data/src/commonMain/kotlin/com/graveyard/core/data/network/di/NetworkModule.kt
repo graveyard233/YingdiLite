@@ -8,7 +8,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-val networkModule = module {
+fun networkModule(enableDiagnosticBodies: Boolean = false) = module {
     single {
         Json {
             ignoreUnknownKeys = true
@@ -16,7 +16,7 @@ val networkModule = module {
         }
     }
     single {
-        getHttpClient(json = get())
+        getHttpClient(json = get(), enableDiagnosticBodies = enableDiagnosticBodies)
     }
     singleOf(::YingdiNetData).bind(YingdiData::class)
 }

@@ -181,7 +181,7 @@ private fun AppNavEntry(
     navigator: Navigator,
 ) {
     when (key) {
-        NewsRoute -> NewsScreen { navigator.navigate(NewsChildRoute) }
+        NewsRoute -> NewsScreen()
         NewsChildRoute -> NewsChildScreen(navigator::goBack)
         CommunityRoute -> CommunityScreen { navigator.navigate(CommunityChildRoute) }
         CommunityChildRoute -> CommunityChildScreen(navigator::goBack)
