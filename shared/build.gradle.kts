@@ -83,6 +83,7 @@ kotlin {
 
             implementation(project(":core:designsystem"))
             implementation(project(":core:data"))
+            implementation(project(":core:utils"))
 
             implementation(project(":feature:news"))
             implementation(project(":feature:community"))

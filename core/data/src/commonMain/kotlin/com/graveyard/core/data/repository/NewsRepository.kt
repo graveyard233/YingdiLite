@@ -1,6 +1,7 @@
 package com.graveyard.core.data.repository
 
 import androidx.paging.PagingData
+import com.graveyard.core.data.paging.NewsRefreshEvent
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
@@ -13,5 +14,6 @@ interface NewsRepository {
     fun getNews(
         tagId: Int,
         pageSize: Int = 20,
+        onRefreshEvent: ((NewsRefreshEvent) -> Unit)? = null,
     ): Flow<PagingData<NewsArticle>>
 }

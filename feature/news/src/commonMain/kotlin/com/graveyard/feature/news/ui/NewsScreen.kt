@@ -1,316 +1,214 @@
 package com.graveyard.feature.news.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
-import com.graveyard.core.data.result.DataError
+import androidx.paging.compose.itemKey
+import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.core.model.news.NewsBanner
+import com.graveyard.feature.news.model.NewsCategory
 import com.graveyard.feature.news.viewmodel.BannerUiState
-import com.graveyard.feature.news.viewmodel.NewsViewModel
-import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-private val testTagIds = listOf(17, 18, 859)
-private const val defaultTagId = 17
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsScreen(
-    viewModel: NewsViewModel = koinViewModel(),
+    categories: List<NewsCategory>,
+    pagerState: PagerState,
+    onSelectCategory: (NewsCategory) -> Unit,
+    pageContent: @Composable (NewsCategory) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val activeTagId = uiState.selectedTagId ?: defaultTagId
-    val newsItems = remember(activeTagId) {
-        viewModel.newsFor(activeTagId)
-    }.collectAsLazyPagingItems()
-    val bannerState = uiState.bannersByTag[activeTagId] ?: BannerUiState()
-
-    LaunchedEffect(viewModel) {
-        viewModel.selectTag(defaultTagId)
+    val colors = MaterialTheme.colorScheme
+    val selectedTabIndex = if (categories.isEmpty()) {
+        0
+    } else {
+        pagerState.currentPage.coerceIn(categories.indices)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Text(
-            text = "News ViewModel 网络测试",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "切换 tagId，观察 Banner 和分页请求状态",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
+    Scaffold(
+        modifier = modifier,
+        containerColor = colors.surfaceContainerLowest,
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        PrimaryScrollableTabRow(
+                            selectedTabIndex = selectedTabIndex,
+                            edgePadding = 16.dp,
+                            divider = {},
+                        ) {
+                            categories.forEachIndexed { index, category ->
+                                Tab(
+                                    selected = index == selectedTabIndex,
+                                    onClick = { onSelectCategory(category) },
+                                    text = { Text(category.label) },
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        UnavailableNewsAction(AppIcon.Search, "搜索")
+                    },
+                )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            }
+        },
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding),
         ) {
-            testTagIds.forEach { tagId ->
-                if (tagId == activeTagId) {
-                    Button(
-                        onClick = { viewModel.selectTag(tagId) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                key = { page -> categories[page].id },
+            ) { page ->
+                pageContent(categories[page])
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
+@Composable
+internal fun NewsPage(
+    bannerState: BannerUiState,
+    newsItems: LazyPagingItems<NewsArticle>?,
+    listState: LazyListState,
+    isRefreshing: Boolean,
+    onRetryBanners: () -> Unit,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val nowEpochSeconds = Clock.System.now().epochSeconds
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            when {
+                bannerState.items.isNotEmpty() -> item(
+                    key = "banners",
+                    contentType = "banners",
+                ) {
+                    NewsBannerCarousel(bannerState.items)
+                }
+                bannerState.isLoading -> item(
+                    key = "banners",
+                    contentType = "banner-placeholder",
+                ) {
+                    BannerPlaceholder()
+                }
+                bannerState.error != null -> item(
+                    key = "banner-error",
+                    contentType = "status",
+                ) {
+                    NewsErrorState(
+                        title = "推荐内容加载失败",
+                        message = bannerState.error.newsErrorMessage(),
+                        onRetry = onRetryBanners,
+                        compact = true,
+                    )
+                }
+            }
+
+            val refresh = newsItems?.loadState?.refresh ?: LoadState.Loading
+            if (newsItems == null || newsItems.itemCount == 0) {
+                when (refresh) {
+                    LoadState.Loading -> items(
+                        count = 4,
+                        key = { "news-placeholder-$it" },
+                        contentType = { "news-placeholder" },
                     ) {
-                        Text("tag $tagId")
+                        NewsArticlePlaceholder()
                     }
-                } else {
-                    OutlinedButton(
-                        onClick = { viewModel.selectTag(tagId) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
+                    is LoadState.Error -> item(
+                        key = "news-error",
+                        contentType = "status",
                     ) {
-                        Text("tag $tagId")
+                        NewsErrorState(
+                            title = "新闻加载失败",
+                            message = refresh.error.newsErrorMessage(),
+                            onRetry = { newsItems?.retry() },
+                        )
+                    }
+                    is LoadState.NotLoading -> item(
+                        key = "news-empty",
+                        contentType = "status",
+                    ) {
+                        NewsEmptyState()
+                    }
+                }
+            } else {
+                items(
+                    count = newsItems.itemCount,
+                    key = newsItems.itemKey { "news-${it.id}" },
+                    contentType = { "news" },
+                ) { index ->
+                    newsItems[index]?.let { article ->
+                        NewsArticleItem(article, nowEpochSeconds)
+                    }
+                }
+                // Existing-content refresh errors are reported by the route's Snackbar.
+                if (refresh is LoadState.NotLoading) {
+                    item(key = "news-footer", contentType = "status") {
+                        NewsPagingFooter(newsItems.loadState.append, newsItems::retry)
                     }
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "当前 tagId: $activeTagId",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            OutlinedButton(
-                onClick = {
-                    viewModel.reloadBanners(activeTagId)
-                    newsItems.refresh()
-                },
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text("刷新")
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            state = rememberLazyListState(),
-        ) {
-            bannerSection(bannerState)
-            newsSection(newsItems)
-        }
     }
 }
 
-private fun LazyListScope.bannerSection(state: BannerUiState) {
-    item {
-        Text(
-            text = "Banner (${state.items.size})",
-            style = MaterialTheme.typography.titleMedium,
-        )
-    }
-    when {
-        state.isLoading -> item { LoadingRow("Banner 请求中...") }
-        state.error != null -> item {
-            ErrorRow(
-                message = "Banner 请求失败：${state.error.asMessage()}",
-                onRetry = null,
-            )
-        }
-        state.items.isEmpty() -> item {
-            Text(
-                text = "暂无 Banner 数据",
-                modifier = Modifier.padding(vertical = 8.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        else -> items(state.items) { banner ->
-            BannerRow(banner)
-        }
-    }
-    item { HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp)) }
-}
-
-private fun LazyListScope.newsSection(newsItems: LazyPagingItems<NewsArticle>) {
-    item {
-        Text(
-            text = "新闻列表 (${newsItems.itemCount})",
-            style = MaterialTheme.typography.titleMedium,
-        )
-    }
-
-    when (val refresh = newsItems.loadState.refresh) {
-        LoadState.Loading -> item { LoadingRow("新闻首屏请求中...") }
-        is LoadState.Error -> item {
-            ErrorRow(
-                message = "新闻请求失败：${refresh.error.message ?: "未知错误"}",
-                onRetry = newsItems::retry,
-            )
-        }
-        is LoadState.NotLoading -> if (newsItems.itemCount == 0) {
-            item {
-                Text(
-                    text = "暂无新闻数据",
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-
-    items(count = newsItems.itemCount) { index ->
-        newsItems[index]?.let { article ->
-            ArticleRow(article)
-        }
-    }
-
-    when (val append = newsItems.loadState.append) {
-        LoadState.Loading -> item { LoadingRow("正在加载更多...") }
-        is LoadState.Error -> item {
-            ErrorRow(
-                message = "加载更多失败：${append.error.message ?: "未知错误"}",
-                onRetry = newsItems::retry,
-            )
-        }
-        is LoadState.NotLoading -> if (append.endOfPaginationReached && newsItems.itemCount > 0) {
-            item {
-                Text(
-                    text = "已加载全部数据",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BannerRow(banner: NewsBanner) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = banner.title.ifBlank { "(无标题)" },
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "adId=${banner.adId}  ${banner.url.ifBlank { "(无 URL)" }}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun ArticleRow(article: NewsArticle) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = article.title.ifBlank { "(无标题)" },
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "id=${article.id}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (article.url.isNotBlank()) {
-            Text(
-                text = article.url,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun LoadingRow(message: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun UnavailableNewsAction(icon: AppIcon, label: String) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-        Text(message, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun ErrorRow(
-    message: String,
-    onRetry: (() -> Unit)?,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = message,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-        onRetry?.let {
-            OutlinedButton(
-                onClick = it,
-                shape = RoundedCornerShape(8.dp),
-            ) {
-                Text("重试")
-            }
+        IconButton(onClick = {}, enabled = false) {
+            Icon(imageVector = icon.imageVector, contentDescription = label)
         }
     }
-}
-
-private fun DataError.asMessage(): String = when (this) {
-    DataError.Network -> "网络错误"
-    DataError.Timeout -> "请求超时"
-    is DataError.Http -> "HTTP ${statusCode}"
-    is DataError.Business -> listOfNotNull(retCode, retMsg).joinToString("：")
-        .ifBlank { "业务错误" }
-    DataError.Parsing -> "数据解析错误"
-    DataError.Unknown -> "未知错误"
 }

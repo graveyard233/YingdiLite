@@ -6,6 +6,7 @@ import androidx.paging.PagingData
 import com.graveyard.core.data.mapper.toNewsBanner
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.paging.NewsPagingSource
+import com.graveyard.core.data.paging.NewsRefreshEvent
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.data.result.toDataException
 import com.graveyard.core.model.news.NewsArticle
@@ -33,6 +34,7 @@ internal class DefaultNewsRepository(
     override fun getNews(
         tagId: Int,
         pageSize: Int,
+        onRefreshEvent: ((NewsRefreshEvent) -> Unit)?,
     ): Flow<PagingData<NewsArticle>> {
         require(pageSize > 0) { "pageSize must be greater than zero" }
 
@@ -49,6 +51,7 @@ internal class DefaultNewsRepository(
                     remoteDataSource = remoteDataSource,
                     tagId = tagId,
                     pageSize = pageSize,
+                    onRefreshEvent = onRefreshEvent,
                 )
             },
         ).flow

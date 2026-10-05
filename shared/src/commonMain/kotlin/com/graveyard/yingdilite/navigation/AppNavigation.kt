@@ -1,6 +1,7 @@
 package com.graveyard.yingdilite.navigation
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -40,7 +41,7 @@ import com.graveyard.feature.mine.ui.MineScreen
 import com.graveyard.feature.news.navigation.NewsChildRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.feature.news.ui.NewsChildScreen
-import com.graveyard.feature.news.ui.NewsScreen
+import com.graveyard.feature.news.ui.NewsRouteScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.modules.SerializersModule
@@ -132,7 +133,15 @@ fun AppNavigation(
 
     val entries = navigationState.toEntries { key ->
         NavEntry(key) {
-            AppNavEntry(key = key, navigator = navigator)
+            AppNavEntry(
+                key = key,
+                navigator = navigator,
+                onShowMessage = { message ->
+                    if (navigationState.currentKey == key) {
+                        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+                    }
+                },
+            )
         }
     }
 
@@ -158,7 +167,7 @@ fun AppNavigation(
         NavDisplay(
             entries = entries,
             onBack = ::handleBack,
-            modifier = Modifier.padding(paddingValues),
+            modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
         )
         if (onExit != null) {
             NavigationBackHandler(
@@ -179,9 +188,10 @@ private object AppNavigationEventInfo : NavigationEventInfo()
 private fun AppNavEntry(
     key: NavKey,
     navigator: Navigator,
+    onShowMessage: suspend (String) -> Unit,
 ) {
     when (key) {
-        NewsRoute -> NewsScreen()
+        NewsRoute -> NewsRouteScreen(onShowMessage = onShowMessage)
         NewsChildRoute -> NewsChildScreen(navigator::goBack)
         CommunityRoute -> CommunityScreen { navigator.navigate(CommunityChildRoute) }
         CommunityChildRoute -> CommunityChildScreen(navigator::goBack)

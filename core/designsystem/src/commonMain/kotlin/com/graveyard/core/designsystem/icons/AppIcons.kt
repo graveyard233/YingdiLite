@@ -18,4 +18,10 @@ enum class AppIcon(val imageVector: ImageVector) {
     CardsFill(cardsFill),
     AccountCircle(accountCircle),
     AccountCircleFill(accountCircleFill),
+    Search(searchIcon),
+    Tune(tuneIcon),
+    Notifications(notificationsIcon),
+    Comment(commentIcon),
+    Image(imageIcon),
+    Refresh(refreshIcon),
 }

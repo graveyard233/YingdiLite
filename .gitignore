@@ -25,3 +25,5 @@ node_modules/
 
 # DSH 沙箱排查文件权限时产生的临时记录
 /.acl-recovery/
+
+.agents/
