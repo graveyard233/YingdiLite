@@ -1,12 +1,11 @@
 package com.graveyard.feature.news.ui
 
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
@@ -18,35 +17,40 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.paging.LoadState
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.feature.news.model.DefaultNewsCategories
 import com.graveyard.feature.news.model.NewsCategory
 import com.graveyard.feature.news.model.validateNewsCategories
-import com.graveyard.feature.news.viewmodel.BannerUiState
 import com.graveyard.feature.news.viewmodel.NewsViewModel
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
     categories: List<NewsCategory> = DefaultNewsCategories,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
-    validateNewsCategories(categories)
-    val categoryIds = categories.map { it.id }
-    val uiState by viewModel.uiState.collectAsState()
-    val activeTagId = uiState.selectedTagId?.takeIf { it in categoryIds } ?: categoryIds.first()
+    val categoryIds = remember(categories) {
+        validateNewsCategories(categories)
+        categories.map { it.id }
+    }
+    val selectedTagIds = remember(viewModel) {
+        viewModel.uiState.map { it.selectedTagId }.distinctUntilChanged()
+    }
+    val selectedTagId by selectedTagIds.collectAsState(
+        initial = viewModel.uiState.value.selectedTagId,
+    )
+    val activeTagId = selectedTagId?.takeIf { it in categoryIds } ?: categoryIds.first()
     val currentTagId by rememberUpdatedState(activeTagId)
     val currentCategoryIds by rememberUpdatedState(categoryIds)
     val showMessage by rememberUpdatedState(onShowMessage)
@@ -56,6 +60,9 @@ fun NewsRouteScreen(
         pageCount = { categories.size },
     )
     val scope = rememberCoroutineScope()
+    val pagingItemsByTag = remember(viewModel) {
+        mutableStateMapOf<Int, LazyPagingItems<NewsArticle>>()
+    }
     val refreshJobs = remember { mutableStateMapOf<Int, Job>() }
     var messageJob by remember { mutableStateOf<Job?>(null) }
     var visitedTagIds by rememberSaveable { mutableStateOf(emptyList<Int>()) }
@@ -76,6 +83,7 @@ fun NewsRouteScreen(
         val removedIds = previousCategoryIds.filter { it !in categoryIds }
         removedIds.forEach { tagId ->
             refreshJobs.remove(tagId)?.cancel()
+            pagingItemsByTag.remove(tagId)
             stateHolder.removeState(tagId)
         }
         visitedTagIds = visitedTagIds.filter { it in categoryIds }
@@ -128,18 +136,21 @@ fun NewsRouteScreen(
     }
 
     // Keep visited presenters alive so a refresh can finish after switching categories.
-    val pagingItemsByTag = mutableMapOf<Int, LazyPagingItems<NewsArticle>>()
-    val visibleTagIds = pagerState.layoutInfo.visiblePagesInfo.mapNotNull { page ->
-        categoryIds.getOrNull(page.index)
+    val collectionPageIndices by remember(pagerState) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            (pagerState.layoutInfo.visiblePagesInfo.map { it.index } + pagerState.targetPage)
+                .distinct()
+                .sorted()
+        }
     }
-    val targetTagId = categoryIds.getOrNull(pagerState.targetPage)
-    val collectedIds = (visitedTagIds + activeTagId + visibleTagIds + listOfNotNull(targetTagId))
-        .distinct()
-        .filter { it in categoryIds }
+    val collectedIds = remember(visitedTagIds, activeTagId, collectionPageIndices, categoryIds) {
+        (visitedTagIds + activeTagId + collectionPageIndices.mapNotNull { categoryIds.getOrNull(it) })
+            .distinct()
+            .filter { it in categoryIds }
+    }
     for (tagId in collectedIds) {
         key(tagId) {
-            val news = remember(viewModel, tagId) { viewModel.newsFor(tagId) }
-            pagingItemsByTag[tagId] = news.collectAsLazyPagingItems()
+            NewsPagingCollector(tagId, viewModel, pagingItemsByTag)
         }
     }
 
@@ -155,80 +166,40 @@ fun NewsRouteScreen(
             viewModel.selectTag(category.id)
         },
         pageContent = { category ->
-            val tagId = category.id
-            LaunchedEffect(tagId) {
-                visitedTagIds = (visitedTagIds + tagId).distinct()
-                if (tagId !in viewModel.uiState.value.bannersByTag) {
-                    viewModel.reloadBanners(tagId)
-                }
-            }
-            stateHolder.SaveableStateProvider(tagId) {
-                val listState = rememberLazyListState()
-                val newsItems = pagingItemsByTag[tagId]
-                val bannerState = uiState.bannersByTag[tagId] ?: BannerUiState(isLoading = true)
-                NewsPage(
-                    bannerState = bannerState,
-                    newsItems = newsItems,
-                    listState = listState,
-                    isRefreshing = tagId in refreshJobs,
-                    onRetryBanners = {
-                        if (tagId !in refreshJobs &&
-                            viewModel.uiState.value.bannersByTag[tagId]?.isLoading != true
-                        ) {
-                            viewModel.reloadBanners(tagId)
-                        }
-                    },
-                    onRefresh = {
-                        if (isCurrentPage(tagId) &&
-                            newsItems != null &&
-                            tagId !in refreshJobs &&
-                            newsItems.loadState.refresh !is LoadState.Loading &&
-                            !bannerState.isLoading
-                        ) {
-                            val refreshState = viewModel.pagingRefreshStateFor(tagId)
-                            val previousRequest = refreshState.value.request
-                            val hadNews = newsItems.itemCount > 0
-                            val hadBanners = bannerState.items.isNotEmpty()
-                            val job = scope.launch(start = CoroutineStart.LAZY) {
-                                try {
-                                    val bannerJob = viewModel.reloadBanners(tagId)
-                                    newsItems.refresh()
-                                    val newsResult = refreshState.first {
-                                        it.request !== previousRequest && !it.isLoading
-                                    }
-                                    bannerJob.join()
-                                    if (newsResult.isCancelled || bannerJob.isCancelled) return@launch
-                                    if (isCurrentPage(tagId) && newsResult.error == null) {
-                                        listState.scrollToItem(0)
-                                    }
-
-                                    val banners = viewModel.uiState.value.bannersByTag[tagId]
-                                    val failures = buildList {
-                                        if (hadNews && newsResult.error != null) add("新闻")
-                                        if (hadBanners && banners?.error != null) add("推荐内容")
-                                    }
-                                    if (isCurrentPage(tagId) && failures.isNotEmpty()) {
-                                        messageJob?.cancel()
-                                        messageJob = scope.launch {
-                                            if (isCurrentPage(tagId)) {
-                                                showMessage(
-                                                    "${failures.joinToString("、")}刷新失败，已保留原内容",
-                                                )
-                                            }
-                                        }
-                                    }
-                                } finally {
-                                    if (refreshJobs[tagId] === currentCoroutineContext()[Job]) {
-                                        refreshJobs.remove(tagId)
-                                    }
-                                }
-                            }
-                            refreshJobs[tagId] = job
-                            job.start()
-                        }
-                    },
-                )
-            }
+            NewsCategoryPage(
+                tagId = category.id,
+                viewModel = viewModel,
+                pagingItemsByTag = pagingItemsByTag,
+                refreshJobs = refreshJobs,
+                stateHolder = stateHolder,
+                scope = scope,
+                isCurrentPage = isCurrentPage,
+                onPageVisited = { tagId ->
+                    visitedTagIds = (visitedTagIds + tagId).distinct()
+                },
+                onShowRefreshFailure = { tagId, message ->
+                    messageJob?.cancel()
+                    messageJob = scope.launch {
+                        if (isCurrentPage(tagId)) showMessage(message)
+                    }
+                },
+            )
         },
     )
+}
+
+@Composable
+private fun NewsPagingCollector(
+    tagId: Int,
+    viewModel: NewsViewModel,
+    pagingItemsByTag: SnapshotStateMap<Int, LazyPagingItems<NewsArticle>>,
+) {
+    val news = remember(viewModel, tagId) { viewModel.newsFor(tagId) }
+    val newsItems = news.collectAsLazyPagingItems()
+    DisposableEffect(tagId, pagingItemsByTag, newsItems) {
+        pagingItemsByTag[tagId] = newsItems
+        onDispose {
+            if (pagingItemsByTag[tagId] === newsItems) pagingItemsByTag.remove(tagId)
+        }
+    }
 }

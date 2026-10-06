@@ -12,6 +12,10 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -68,25 +72,33 @@ internal class YingdiNetData(
             throw DataException(DataError.Http(statusCode = status.value))
         }
 
-        val payload = json.parseToJsonElement(bodyAsText()) as? JsonObject
-            ?: throw DataException(DataError.Parsing)
+        val body = bodyAsText()
+        currentCoroutineContext().ensureActive()
+        return withContext(Dispatchers.Default) {
+            currentCoroutineContext().ensureActive()
+            val payload = json.parseToJsonElement(body) as? JsonObject
+                ?: throw DataException(DataError.Parsing)
 
-        // DTO defaults must not turn error envelopes into successful empty lists.
-        if (expectedArrayField !in payload) {
-            if ("retCode" in payload || "retMsg" in payload) {
-                throw DataException(
-                    DataError.Business(
-                        retCode = (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
-                        retMsg = (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
-                    ),
-                )
+            // DTO defaults must not turn error envelopes into successful empty lists.
+            if (expectedArrayField !in payload) {
+                if ("retCode" in payload || "retMsg" in payload) {
+                    throw DataException(
+                        DataError.Business(
+                            retCode = (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
+                            retMsg = (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
+                        ),
+                    )
+                }
+                throw DataException(DataError.Parsing)
             }
-            throw DataException(DataError.Parsing)
-        }
-        if (payload[expectedArrayField] !is JsonArray) {
-            throw DataException(DataError.Parsing)
-        }
+            if (payload[expectedArrayField] !is JsonArray) {
+                throw DataException(DataError.Parsing)
+            }
 
-        return json.decodeFromJsonElement<T>(payload)
+            currentCoroutineContext().ensureActive()
+            val result = json.decodeFromJsonElement<T>(payload)
+            currentCoroutineContext().ensureActive()
+            result
+        }
     }
 }
