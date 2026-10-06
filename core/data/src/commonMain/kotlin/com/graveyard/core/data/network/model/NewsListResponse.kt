@@ -71,3 +71,12 @@ internal data class NewsFeed(
     @SerialName("show_time")
     val showTime: Long = 0L,
 )
+
+/**
+ * `tag_json` 二次解析后的单个标签条目。
+ */
+@Serializable
+internal data class NewsArticleTag(
+    @SerialName("tag")
+    val label: String = "",
+)

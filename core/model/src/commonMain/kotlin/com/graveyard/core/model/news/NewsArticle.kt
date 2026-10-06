@@ -1,6 +1,6 @@
 package com.graveyard.core.model.news
 
-/** Embedded JSON, counters and timestamps retain their original values and types. */
+/** Counters and timestamps retain their original values and types; embedded JSON is parsed into structured fields. */
 data class NewsArticle(
     val id: Long = 0L,
     val author: NewsAuthor = NewsAuthor(),
@@ -11,7 +11,8 @@ data class NewsArticle(
     val imgs: String = "",
     val cover: String = "",
     val url: String = "",
-    val tagJson: String = "",
+    /** Labels parsed from the API's embedded `tag_json` string; empty when absent or malformed. */
+    val tags: List<String> = emptyList(),
     val likeNum: String = "",
     val replyNum: String = "",
     val deckInfoJson: String = "",

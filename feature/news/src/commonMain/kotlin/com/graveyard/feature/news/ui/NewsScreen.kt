@@ -155,7 +155,7 @@ internal fun NewsPage(
             if (newsItems == null || newsItems.itemCount == 0) {
                 when (refresh) {
                     LoadState.Loading -> items(
-                        count = 4,
+                        count = 5,
                         key = { "news-placeholder-$it" },
                         contentType = { "news-placeholder" },
                     ) {

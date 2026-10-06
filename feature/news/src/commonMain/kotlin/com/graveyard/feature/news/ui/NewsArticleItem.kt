@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,67 +18,68 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.constrainHeight
-import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import com.graveyard.core.model.news.NewsArticle
 
 @Composable
 internal fun NewsArticleItem(article: NewsArticle, nowEpochSeconds: Long) {
-    val labels = remember(article.tagJson) {
-        articleTagLabels(article.tagJson).take(2).joinToString(" / ")
-    }
+    val label = article.tags.firstOrNull().orEmpty()
     val time = relativeNewsTime(article.showTime, nowEpochSeconds)
     val replies = remember(article.replyNum) { commentCount(article.replyNum) }
     val metadata = remember(time, replies) {
         listOfNotNull(time, replies?.let { "$it 评论" }).joinToString(" · ")
     }
     val colors = MaterialTheme.colorScheme
-    val largeFont = LocalDensity.current.fontScale > 1.3f
-    val cardHeight = if (largeFont) 184.dp else 144.dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(cardHeight)
+            .height(120.dp)
             .clip(MaterialTheme.shapes.large)
             .background(colors.surfaceContainerLow)
             .semantics(mergeDescendants = true) {},
     ) {
-        Layout(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            content = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.weight(1f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (labels.isNotEmpty()) {
+                    if (label.isNotEmpty()) {
                         Text(
-                            text = labels,
+                            text = label,
                             modifier = Modifier
                                 .background(colors.primaryFixed, MaterialTheme.shapes.extraSmall)
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelMedium,
                             color = colors.onPrimaryFixedVariant,
-                            maxLines = if (largeFont) 1 else 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Text(
-                        text = article.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurface,
-                        maxLines = if (largeFont) 3 else 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                     if (metadata.isNotEmpty()) {
                         Text(
                             text = metadata,
@@ -87,45 +90,14 @@ internal fun NewsArticleItem(article: NewsArticle, nowEpochSeconds: Long) {
                         )
                     }
                 }
-                NewsImage(
-                    url = article.cover,
-                    modifier = Modifier.clip(MaterialTheme.shapes.small),
-                )
-            },
-        ) { measurables, constraints ->
-            // Size the image during measurement without subcomposing each article.
-            val compactImage = largeFont ||
-                (constraints.hasBoundedWidth && constraints.maxWidth.toDp() < 300.dp)
-            val preferredImageSize = (if (compactImage) 72.dp else 96.dp).roundToPx()
-            val imageSize = minOf(
-                preferredImageSize,
-                constraints.maxWidth,
-                constraints.maxHeight,
+            }
+            NewsImage(
+                url = article.cover,
+                modifier = Modifier
+                    .height(96.dp)
+                    .aspectRatio(1.4f)
+                    .clip(MaterialTheme.shapes.small),
             )
-            val image = measurables[1].measure(Constraints.fixed(imageSize, imageSize))
-            val gap = if (constraints.hasBoundedWidth) {
-                minOf(12.dp.roundToPx(), (constraints.maxWidth - image.width).coerceAtLeast(0))
-            } else {
-                12.dp.roundToPx()
-            }
-            val textMaxWidth = if (constraints.hasBoundedWidth) {
-                (constraints.maxWidth - image.width - gap).coerceAtLeast(0)
-            } else {
-                Constraints.Infinity
-            }
-            val text = measurables[0].measure(
-                constraints.copy(
-                    minWidth = if (constraints.hasBoundedWidth) textMaxWidth else 0,
-                    maxWidth = textMaxWidth,
-                    minHeight = 0,
-                ),
-            )
-            val width = constraints.constrainWidth(text.width + gap + image.width)
-            val height = constraints.constrainHeight(maxOf(text.height, image.height))
-            layout(width, height) {
-                text.placeRelative(0, 0)
-                image.placeRelative(width - image.width, 0)
-            }
         }
     }
 }
@@ -136,7 +108,7 @@ internal fun NewsArticlePlaceholder() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(144.dp)
+            .height(120.dp)
             .clip(MaterialTheme.shapes.large)
             .background(colors.surfaceContainerLow),
     ) {
@@ -146,14 +118,22 @@ internal fun NewsArticlePlaceholder() {
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Spacer(Modifier.width(64.dp).height(16.dp).background(colors.surfaceContainerHigh))
-                Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+            ) {
                 Spacer(Modifier.fillMaxWidth().height(16.dp).background(colors.surfaceContainerHigh))
                 Spacer(Modifier.height(8.dp))
                 Spacer(Modifier.fillMaxWidth(0.7f).height(16.dp).background(colors.surfaceContainerHigh))
-                Spacer(Modifier.height(12.dp))
-                Spacer(Modifier.width(80.dp).height(12.dp).background(colors.surfaceContainerHigh))
+                Spacer(Modifier.weight(1f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.width(64.dp).height(16.dp).background(colors.surfaceContainerHigh))
+                    Spacer(Modifier.width(80.dp).height(12.dp).background(colors.surfaceContainerHigh))
+                }
             }
             NewsImage("", Modifier.size(96.dp).clip(MaterialTheme.shapes.small))
         }

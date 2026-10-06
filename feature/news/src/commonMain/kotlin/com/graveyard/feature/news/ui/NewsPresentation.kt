@@ -2,27 +2,6 @@ package com.graveyard.feature.news.ui
 
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataException
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
-
-private val newsTagJson = Json { ignoreUnknownKeys = true }
-
-@Serializable
-private data class ArticleTag(
-    @SerialName("tag") val label: String = "",
-)
-
-internal fun articleTagLabels(raw: String): List<String> {
-    if (raw.isBlank()) return emptyList()
-    return runCatching {
-        newsTagJson.decodeFromString<List<ArticleTag>>(raw)
-            .map { it.label.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-    }.getOrDefault(emptyList())
-}
 
 internal fun relativeNewsTime(epochSeconds: Long, nowEpochSeconds: Long): String? {
     if (epochSeconds <= 0 || epochSeconds > nowEpochSeconds) return null

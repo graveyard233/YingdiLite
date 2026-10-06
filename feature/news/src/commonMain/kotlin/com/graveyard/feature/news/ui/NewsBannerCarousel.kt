@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,20 +39,21 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
             state.scrollToPage(banners.lastIndex.coerceAtLeast(0))
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        HorizontalPager(
-            state = state,
-            modifier = Modifier.fillMaxWidth(),
-            key = { index -> "${banners[index].adId}-$index" },
-        ) { index ->
-            val banner = banners[index]
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(maxOf(maxWidth / 2.4f, minimumHeight))
-                        .clip(MaterialTheme.shapes.medium),
-                ) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val bannerHeight = maxOf(maxWidth / 2.4f, minimumHeight)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(bannerHeight)
+                .clip(MaterialTheme.shapes.medium),
+        ) {
+            HorizontalPager(
+                state = state,
+                modifier = Modifier.fillMaxSize(),
+                key = { index -> "${banners[index].adId}-$index" },
+            ) { index ->
+                val banner = banners[index]
+                Box(Modifier.fillMaxSize()) {
                     NewsImage(banner.img, Modifier.fillMaxSize())
                     if (banner.title.isNotBlank()) {
                         Box(
@@ -67,7 +67,13 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
                         )
                         Text(
                             text = banner.title,
-                            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(
+                                    start = 12.dp,
+                                    end = 12.dp,
+                                    bottom = if (banners.size > 1) 16.dp else 12.dp,
+                                ),
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
                             maxLines = 2,
@@ -76,34 +82,35 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
                     }
                 }
             }
-        }
-        if (banners.size > 1) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp)
-                    .semantics { stateDescription = "第${state.currentPage + 1}张，共${banners.size}张" },
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (banners.size > 7) {
-                    Text(
-                        "${state.currentPage + 1}/${banners.size}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    repeat(banners.size) { index ->
-                        Box(
-                            modifier = Modifier
-                                .size(width = if (state.currentPage == index) 20.dp else 4.dp, height = 4.dp)
-                                .background(
-                                    if (state.currentPage == index) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant,
-                                    CircleShape,
-                                )
-                                .clearAndSetSemantics {},
+            if (banners.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, bottom = 8.dp)
+                        .semantics { stateDescription = "第${state.currentPage + 1}张，共${banners.size}张" },
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val indicatorColor = MaterialTheme.colorScheme.primaryFixed
+                    if (banners.size > 7) {
+                        Text(
+                            "${state.currentPage + 1}/${banners.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = indicatorColor,
                         )
+                    } else {
+                        repeat(banners.size) { dotIndex ->
+                            Box(
+                                modifier = Modifier
+                                    .size(width = if (state.currentPage == dotIndex) 20.dp else 4.dp, height = 4.dp)
+                                    .background(
+                                        if (state.currentPage == dotIndex) indicatorColor
+                                        else Color.White.copy(alpha = 0.5f),
+                                        CircleShape,
+                                    )
+                                    .clearAndSetSemantics {},
+                            )
+                        }
                     }
                 }
             }
