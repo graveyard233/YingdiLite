@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -25,7 +24,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,6 +31,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.graveyard.core.designsystem.icons.AppIcon
+import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.feature.news.model.NewsCategory
 import com.graveyard.feature.news.viewmodel.BannerUiState
@@ -122,17 +121,17 @@ internal fun NewsPage(
 ) {
     val nowEpochSeconds = Clock.System.now().epochSeconds
 
-    PullToRefreshBox(
+    val refresh = newsItems?.loadState?.refresh ?: LoadState.Loading
+    val hasNews = newsItems != null && newsItems.itemCount > 0
+
+    CommonList(
+        state = listState,
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = modifier.fillMaxSize(),
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+        header = {
             when {
                 bannerState.items.isNotEmpty() -> item(
                     key = "banners",
@@ -158,9 +157,9 @@ internal fun NewsPage(
                     )
                 }
             }
-
-            val refresh = newsItems?.loadState?.refresh ?: LoadState.Loading
-            if (newsItems == null || newsItems.itemCount == 0) {
+        },
+        content = {
+            if (!hasNews) {
                 when (refresh) {
                     LoadState.Loading -> items(
                         count = 5,
@@ -193,18 +192,24 @@ internal fun NewsPage(
                     contentType = { "news" },
                 ) { index ->
                     newsItems[index]?.let { article ->
-                        NewsArticleItem(article, nowEpochSeconds)
-                    }
-                }
-                // Existing-content refresh errors are reported by the route's Snackbar.
-                if (refresh is LoadState.NotLoading) {
-                    item(key = "news-footer", contentType = "status") {
-                        NewsPagingFooter(newsItems.loadState.append, newsItems::retry)
+                        NewsArticleItem(
+                            article = article,
+                            nowEpochSeconds = nowEpochSeconds,
+                            modifier = Modifier.animateItem(),
+                        )
                     }
                 }
             }
-        }
-    }
+        },
+        footer = {
+            // Existing-content refresh errors are reported by the route's Snackbar.
+            if (hasNews && refresh is LoadState.NotLoading) {
+                item(key = "news-footer", contentType = "status") {
+                    NewsPagingFooter(newsItems!!.loadState.append, newsItems::retry)
+                }
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

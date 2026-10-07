@@ -75,14 +75,17 @@ kotlin {
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
 
-            implementation(libs.datastore.core)
-            implementation(libs.datastore.preferences.core)
-
             implementation(libs.androidx.room3.runtime)
             implementation(libs.androidx.sqlite.bundled)
 
+            // App() 的公共签名直接使用 DataStore<Preferences>，需在本模块直接声明，
+            // 不能只靠 :core:data 的传递依赖（IDE 的 KMP 元数据解析会标红）。
+            api(libs.datastore.core)
+            api(libs.datastore.preferences.core)
+
             implementation(project(":core:designsystem"))
-            implementation(project(":core:data"))
+            // api：平台入口（androidApp / iosApp）需要直接调用 core:data 的 DataStore 工厂。
+            api(project(":core:data"))
             implementation(project(":core:utils"))
 
             implementation(project(":feature:news"))

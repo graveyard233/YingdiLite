@@ -73,10 +73,14 @@ internal data class NewsFeed(
 )
 
 /**
- * `tag_json` 二次解析后的单个标签条目。
+ * 新闻标签条目。
+ *
+ * 既是接口 `tag_json` 的二次解析 DTO，也作为本地用户设置（订阅标签列表）的存储模型，
+ * JSON 形状固定为 `{"tag": <名称>, "id": <ID>}`；新增字段必须带默认值以兼容旧数据。
  */
 @Serializable
-internal data class NewsArticleTag(
+data class NewsArticleTag(
     @SerialName("tag")
     val label: String = "",
+    val id: Int = 0
 )

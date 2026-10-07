@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +29,7 @@ import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.news_comments
 
 @Composable
-internal fun NewsArticleItem(
+internal fun NewsArticleCardItem(
     article: NewsArticle,
     nowEpochSeconds: Long,
     modifier: Modifier = Modifier,
@@ -43,18 +43,19 @@ internal fun NewsArticleItem(
     ).joinToString(" · ")
     val colors = MaterialTheme.colorScheme
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
+            .height(120.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(colors.surfaceContainerLow)
             .semantics(mergeDescendants = true) {},
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(112.dp)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
                 modifier = Modifier
@@ -100,27 +101,28 @@ internal fun NewsArticleItem(
             NewsImage(
                 url = article.cover,
                 modifier = Modifier
-                    .size(width = 124.dp, height = 88.dp)
+                    .height(96.dp)
+                    .aspectRatio(1.4f)
                     .clip(MaterialTheme.shapes.small),
             )
         }
-        HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.45f))
     }
 }
 
 @Composable
-internal fun NewsArticlePlaceholder() {
+internal fun NewsArticleCardPlaceholder(modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(112.dp)
+            .height(120.dp)
+            .clip(MaterialTheme.shapes.large)
             .background(colors.surfaceContainerLow),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(
@@ -140,7 +142,7 @@ internal fun NewsArticlePlaceholder() {
                     Spacer(Modifier.width(80.dp).height(12.dp).background(colors.surfaceContainerHigh))
                 }
             }
-            NewsImage("", Modifier.size(width = 124.dp, height = 88.dp).clip(MaterialTheme.shapes.small))
+            NewsImage("", Modifier.size(96.dp).clip(MaterialTheme.shapes.small))
         }
     }
 }

@@ -22,8 +22,6 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.feature.news.model.DefaultNewsCategories
-import com.graveyard.feature.news.model.NewsCategory
 import com.graveyard.feature.news.model.validateNewsCategories
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.Job
@@ -37,9 +35,9 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
-    categories: List<NewsCategory> = DefaultNewsCategories,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
+    val categories by viewModel.categories.collectAsState()
     val categoryIds = remember(categories) {
         validateNewsCategories(categories)
         categories.map { it.id }

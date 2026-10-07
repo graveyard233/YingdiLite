@@ -72,6 +72,9 @@ kotlin {
 
                 api(libs.kotlinx.coroutines.core)
 
+                api(libs.datastore.core)
+                api(libs.datastore.preferences.core)
+
                 api(libs.androidx.paging.common)
             }
         }

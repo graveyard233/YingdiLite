@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.graveyard.core.data.local.preferences.DefaultArticleTags
+import com.graveyard.core.data.local.preferences.UserSettings
+import com.graveyard.core.data.network.model.NewsArticleTag
 import com.graveyard.core.data.paging.NewsRefreshEvent
 import com.graveyard.core.data.repository.NewsRepository
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.model.news.NewsArticle
+import com.graveyard.feature.news.model.NewsCategory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -18,16 +22,29 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class NewsViewModel(
     private val repository: NewsRepository,
+    userSettings: UserSettings,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(NewsUiState())
     val uiState: StateFlow<NewsUiState> = mutableUiState.asStateFlow()
+
+    // 新闻标签来自用户设置；同步缓存值作为初始值避免首帧空白，空列表回退内置默认（TabRow 要求非空）。
+    val categories: StateFlow<List<NewsCategory>> = userSettings.articleTags
+        .map { tags -> tags.toCategories() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = userSettings.getArticleTags().toCategories(),
+        )
 
     private val newsSessions = mutableMapOf<Int, NewsSession>()
     private val bannerJobs = mutableMapOf<Int, Job>()
@@ -154,7 +171,15 @@ class NewsViewModel(
         newsSessions.clear()
         super.onCleared()
     }
+
+    private companion object {
+        const val STOP_TIMEOUT_MILLIS = 5_000L
+    }
 }
+
+/** 用户设置标签 → UI 分类；空列表回退内置默认标签。 */
+private fun List<NewsArticleTag>.toCategories(): List<NewsCategory> =
+    ifEmpty { DefaultArticleTags }.map { NewsCategory(id = it.id, label = it.label) }
 
 private class NewsSession(
     val scope: CoroutineScope,
