@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,15 +24,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.graveyard.core.model.news.NewsArticle
+import org.jetbrains.compose.resources.stringResource
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_comments
 
 @Composable
 internal fun NewsArticleItem(article: NewsArticle, nowEpochSeconds: Long) {
     val label = article.tags.firstOrNull().orEmpty()
     val time = relativeNewsTime(article.showTime, nowEpochSeconds)
-    val replies = remember(article.replyNum) { commentCount(article.replyNum) }
-    val metadata = remember(time, replies) {
-        listOfNotNull(time, replies?.let { "$it 评论" }).joinToString(" · ")
-    }
+    val replies = commentCount(article.replyNum)
+    val metadata = listOfNotNull(
+        time,
+        replies?.let { stringResource(Res.string.news_comments, it) },
+    ).joinToString(" · ")
     val colors = MaterialTheme.colorScheme
 
     Box(

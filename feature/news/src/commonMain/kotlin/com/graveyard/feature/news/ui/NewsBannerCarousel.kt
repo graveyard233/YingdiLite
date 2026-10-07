@@ -29,6 +29,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.graveyard.core.model.news.NewsBanner
+import org.jetbrains.compose.resources.stringResource
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_banner_page_status
 
 @Composable
 internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
@@ -83,11 +86,16 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
                 }
             }
             if (banners.size > 1) {
+                val pageStatus = stringResource(
+                    Res.string.news_banner_page_status,
+                    state.currentPage + 1,
+                    banners.size,
+                )
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 12.dp, bottom = 8.dp)
-                        .semantics { stateDescription = "第${state.currentPage + 1}张，共${banners.size}张" },
+                        .semantics { stateDescription = pageStatus },
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

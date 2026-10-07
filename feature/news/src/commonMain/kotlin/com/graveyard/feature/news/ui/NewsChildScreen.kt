@@ -10,6 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.stringResource
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_back
+import yingdilite.feature.news.generated.resources.news_child_title
 
 @Composable
 fun NewsChildScreen(onBack: () -> Unit) {
@@ -21,9 +25,9 @@ fun NewsChildScreen(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("News 子页面")
+            Text(stringResource(Res.string.news_child_title))
             Button(onClick = onBack) {
-                Text("返回")
+                Text(stringResource(Res.string.news_back))
             }
         }
     }

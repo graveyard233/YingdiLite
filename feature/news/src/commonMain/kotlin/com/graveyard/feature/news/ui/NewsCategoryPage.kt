@@ -14,6 +14,12 @@ import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.compose.resources.getString
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_refresh_failure
+import yingdilite.feature.news.generated.resources.news_refresh_section_news
+import yingdilite.feature.news.generated.resources.news_refresh_section_recommendations
+import yingdilite.feature.news.generated.resources.news_refresh_section_separator
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -89,13 +95,22 @@ internal fun NewsCategoryPage(
 
                             val refreshedBanners = viewModel.uiState.value.bannersByTag[tagId]
                             val failures = buildList {
-                                if (hadNews && newsResult.error != null) add("新闻")
-                                if (hadBanners && refreshedBanners?.error != null) add("推荐内容")
+                                if (hadNews && newsResult.error != null) {
+                                    add(getString(Res.string.news_refresh_section_news))
+                                }
+                                if (hadBanners && refreshedBanners?.error != null) {
+                                    add(getString(Res.string.news_refresh_section_recommendations))
+                                }
                             }
                             if (isCurrentPage(tagId) && failures.isNotEmpty()) {
                                 onShowRefreshFailure(
                                     tagId,
-                                    "${failures.joinToString("、")}刷新失败，已保留原内容",
+                                    getString(
+                                        Res.string.news_refresh_failure,
+                                        failures.joinToString(
+                                            getString(Res.string.news_refresh_section_separator),
+                                        ),
+                                    ),
                                 )
                             }
                         } finally {

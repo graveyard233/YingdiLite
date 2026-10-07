@@ -18,6 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import com.graveyard.core.designsystem.icons.AppIcon
+import org.jetbrains.compose.resources.stringResource
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_empty
+import yingdilite.feature.news.generated.resources.news_load_more_failed
+import yingdilite.feature.news.generated.resources.news_loading_more
+import yingdilite.feature.news.generated.resources.news_no_more
+import yingdilite.feature.news.generated.resources.news_retry
 
 @Composable
 internal fun NewsErrorState(
@@ -44,7 +51,7 @@ internal fun NewsErrorState(
         OutlinedButton(onClick = onRetry, shape = MaterialTheme.shapes.small) {
             Icon(AppIcon.Refresh.imageVector, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("重试")
+            Text(stringResource(Res.string.news_retry))
         }
     }
 }
@@ -62,7 +69,10 @@ internal fun NewsEmptyState() {
             tint = MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(32.dp),
         )
-        Text("暂无新闻", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            stringResource(Res.string.news_empty),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -76,13 +86,13 @@ internal fun NewsPagingFooter(state: LoadState, onRetry: () -> Unit) {
         ) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             Text(
-                "正在加载更多",
+                stringResource(Res.string.news_loading_more),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         is LoadState.Error -> NewsErrorState(
-            title = "加载更多失败",
+            title = stringResource(Res.string.news_load_more_failed),
             message = state.error.newsErrorMessage(),
             onRetry = onRetry,
             compact = true,
@@ -93,7 +103,7 @@ internal fun NewsPagingFooter(state: LoadState, onRetry: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "没有更多了",
+                    stringResource(Res.string.news_no_more),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+    <!-- Common actions -->
+    <string name="news_back">Back</string>
+    <string name="news_retry">Retry</string>
+    <string name="news_search">Search</string>
+
+    <!-- Article item -->
+    <string name="news_comments">%1$s comments</string>
+    <string name="news_reply_count_large">%1$d0k+</string>
+    <string name="news_time_just_now">Just now</string>
+    <string name="news_time_minutes_ago">%1$d min ago</string>
+    <string name="news_time_hours_ago">%1$d h ago</string>
+    <string name="news_time_days_ago">%1$d d ago</string>
+
+    <!-- Banner carousel -->
+    <string name="news_banner_page_status">Image %1$d of %2$d</string>
+
+    <!-- List status -->
+    <string name="news_loading_more">Loading more...</string>
+    <string name="news_load_more_failed">Failed to load more</string>
+    <string name="news_no_more">No more results</string>
+    <string name="news_empty">No news yet</string>
+    <string name="news_load_failed">Failed to load news</string>
+    <string name="news_banners_load_failed">Failed to load recommendations</string>
+
+    <!-- Pull-to-refresh partial failure -->
+    <string name="news_refresh_section_news">News</string>
+    <string name="news_refresh_section_recommendations">Recommendations</string>
+    <string name="news_refresh_section_separator">, </string>
+    <string name="news_refresh_failure">Could not refresh %1$s. Showing previous content.</string>
+
+    <!-- Errors -->
+    <string name="news_error_network">Network unavailable. Please check your connection.</string>
+    <string name="news_error_timeout">Request timed out. Please try again.</string>
+    <string name="news_error_http">Service unavailable. Please try again later.</string>
+    <string name="news_error_business">Could not fetch content. Please try again later.</string>
+    <string name="news_error_parsing">Could not read content. Please try again later.</string>
+    <string name="news_error_generic">Could not load right now. Please try again later.</string>
+
+    <!-- Placeholder screens -->
+    <string name="news_child_title">News subpage</string>
+</resources>

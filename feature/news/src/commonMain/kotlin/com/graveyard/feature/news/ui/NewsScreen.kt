@@ -36,6 +36,11 @@ import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.feature.news.model.NewsCategory
 import com.graveyard.feature.news.viewmodel.BannerUiState
+import org.jetbrains.compose.resources.stringResource
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_banners_load_failed
+import yingdilite.feature.news.generated.resources.news_load_failed
+import yingdilite.feature.news.generated.resources.news_search
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -77,7 +82,10 @@ fun NewsScreen(
                         }
                     },
                     actions = {
-                        UnavailableNewsAction(AppIcon.Search, "搜索")
+                        UnavailableNewsAction(
+                            AppIcon.Search,
+                            stringResource(Res.string.news_search),
+                        )
                     },
                 )
 
@@ -143,7 +151,7 @@ internal fun NewsPage(
                     contentType = "status",
                 ) {
                     NewsErrorState(
-                        title = "推荐内容加载失败",
+                        title = stringResource(Res.string.news_banners_load_failed),
                         message = bannerState.error.newsErrorMessage(),
                         onRetry = onRetryBanners,
                         compact = true,
@@ -166,7 +174,7 @@ internal fun NewsPage(
                         contentType = "status",
                     ) {
                         NewsErrorState(
-                            title = "新闻加载失败",
+                            title = stringResource(Res.string.news_load_failed),
                             message = refresh.error.newsErrorMessage(),
                             onRetry = { newsItems?.retry() },
                         )
