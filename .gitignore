@@ -27,3 +27,5 @@ node_modules/
 /.acl-recovery/
 
 .agents/
+
+androidApp/release/

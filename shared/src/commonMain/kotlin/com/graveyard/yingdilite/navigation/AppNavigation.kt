@@ -1,16 +1,22 @@
 package com.graveyard.yingdilite.navigation
 
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,13 +68,15 @@ private val topLevelDestinations = listOf(
 
 private val topLevelKeys = topLevelDestinations.map(TopLevelDestination::key)
 
-// 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型隐藏底部栏。
-private val hiddenBottomBarRouteTypes = setOf(
+// 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型决定是否装饰场景。
+private val hiddenNavigationRouteTypes = setOf(
     CardsChildRoute::class,
     MineChildRoute::class,
     ArticleRoute::class,
 )
 
+@OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
+@Suppress("DEPRECATION") // 与 NavigationSuite 的默认自适应布局计算保持一致。
 @Composable
 fun AppNavigation(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -97,6 +105,7 @@ fun AppNavigation(
         startKey = NewsRoute,
         topLevelKeys = topLevelKeys,
     )
+    val layoutType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
     val navigator = remember(navigationState) { Navigator(navigationState) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -140,16 +149,22 @@ fun AppNavigation(
     }
 
     val entries = navigationState.toEntries { key ->
-        NavEntry(key) {
-            AppNavEntry(
-                key = key,
-                navigator = navigator,
-                onShowMessage = { message ->
-                    if (navigationState.currentKey == key) {
-                        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
-                    }
-                },
-            )
+        NavEntry(key, metadata = mapOf(APP_NAVIGATION_SCENE_KEY to key.hasAppNavigation())) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (key == NewsRoute) Modifier else Modifier.safeDrawingPadding()),
+            ) {
+                AppNavEntry(
+                    key = key,
+                    navigator = navigator,
+                    onShowMessage = { message ->
+                        if (navigationState.currentKey == key) {
+                            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -159,51 +174,58 @@ fun AppNavigation(
         forwardInfo = emptyList(),
     )
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            if (navigationState.currentKey::class !in hiddenBottomBarRouteTypes) {
-                AppBottomBar(
-                    darkTheme = darkTheme,
-                    currentKey = navigationState.currentTopLevelKey,
-                    destinations = topLevelDestinations,
-                    onNavigate = navigator::navigate,
-                )
-            }
-        },
-    ) { paddingValues ->
-        NavDisplay(
-            entries = entries,
-            onBack = ::handleBack,
-            modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
-            transitionSpec = {
-                slideInHorizontally(
-                    initialOffsetX = { it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                ) togetherWith slideOutHorizontally(
-                    targetOffsetX = { -it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                )
-            },
-            popTransitionSpec = {
-                slideInHorizontally(
-                    initialOffsetX = { -it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                ) togetherWith slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                )
-            },
-            predictivePopTransitionSpec = {
-                slideInHorizontally(
-                    initialOffsetX = { -it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                ) togetherWith slideOutHorizontally(
-                    targetOffsetX = { it },
-                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
-                )
-            },
-        )
+    Surface(color = MaterialTheme.colorScheme.background) {
+        SharedTransitionLayout(Modifier.fillMaxSize()) {
+            val navigationSceneDecorator = rememberAppNavigationSceneDecoratorStrategy(
+                layoutType = layoutType,
+                targetHasNavigation = navigationState.currentKey.hasAppNavigation(),
+                navigationSuite = {
+                    AppNavigationSuite(
+                        darkTheme = darkTheme,
+                        currentKey = navigationState.currentTopLevelKey,
+                        destinations = topLevelDestinations,
+                        onNavigate = navigator::navigate,
+                        layoutType = layoutType,
+                    )
+                },
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+                sharedTransitionScope = this,
+            )
+            NavDisplay(
+                entries = entries,
+                onBack = ::handleBack,
+                modifier = Modifier.fillMaxSize(),
+                sceneDecoratorStrategies = listOf(navigationSceneDecorator),
+                sharedTransitionScope = this,
+                transitionSpec = {
+                    slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { -it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    )
+                },
+                popTransitionSpec = {
+                    slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    )
+                },
+                predictivePopTransitionSpec = {
+                    slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    ) togetherWith slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                    )
+                },
+            )
+        }
         if (onExit != null) {
             NavigationBackHandler(
                 state = appBackHandlerState,
@@ -214,6 +236,8 @@ fun AppNavigation(
         }
     }
 }
+
+private fun NavKey.hasAppNavigation(): Boolean = this::class !in hiddenNavigationRouteTypes
 
 private const val ROOT_BACK_CONFIRMATION_WINDOW_MILLIS = 2_000L
 private const val NAVIGATION_TRANSITION_DURATION_MILLIS = 300
