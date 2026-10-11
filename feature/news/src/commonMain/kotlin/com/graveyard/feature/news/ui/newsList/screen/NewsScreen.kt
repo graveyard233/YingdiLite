@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +33,14 @@ import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.TagInfo
+import com.graveyard.feature.news.ui.newsList.component.BannerPlaceholder
+import com.graveyard.feature.news.ui.newsList.component.NewsArticleItem
+import com.graveyard.feature.news.ui.newsList.component.NewsArticlePlaceholder
+import com.graveyard.feature.news.ui.newsList.component.NewsBannerCarousel
+import com.graveyard.feature.news.ui.newsList.component.NewsEmptyState
+import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
+import com.graveyard.feature.news.ui.newsList.component.NewsPagingFooter
+import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
@@ -134,6 +141,7 @@ internal fun NewsPage(
     isRefreshing: Boolean,
     onRetryBanners: () -> Unit,
     onRefresh: () -> Unit,
+    onArticleClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val nowEpochSeconds = Clock.System.now().epochSeconds
@@ -212,6 +220,7 @@ internal fun NewsPage(
                         NewsArticleItem(
                             article = article,
                             nowEpochSeconds = nowEpochSeconds,
+                            onClick = { onArticleClick(article.id) },
                             modifier = Modifier.animateItem(),
                         )
                     }

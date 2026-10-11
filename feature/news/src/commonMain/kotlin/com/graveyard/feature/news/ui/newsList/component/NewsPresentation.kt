@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.component
 
 import androidx.compose.runtime.Composable
 import com.graveyard.core.data.result.DataError

@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.screen
 
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -22,10 +22,10 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
+import com.graveyard.feature.news.ui.newsList.component.NewsTagEditorSheet
 import com.graveyard.feature.news.viewmodel.NewsTagEditor
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -38,6 +38,7 @@ import yingdilite.feature.news.generated.resources.news_tags_save_failed
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
+    onArticleClick: (Long) -> Unit,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
     // Capture this composition's list once. A delegated read in pageCount would see
@@ -192,6 +193,7 @@ fun NewsRouteScreen(
                         if (isCurrentPage(tagId)) showMessage(message)
                     }
                 },
+                onArticleClick = onArticleClick,
             )
         },
     )

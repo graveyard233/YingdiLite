@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

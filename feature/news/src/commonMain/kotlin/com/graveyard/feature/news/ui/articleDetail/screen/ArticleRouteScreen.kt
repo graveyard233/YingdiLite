@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.articleDetail.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,13 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.stringResource
-import yingdilite.feature.news.generated.resources.Res
-import yingdilite.feature.news.generated.resources.news_back
-import yingdilite.feature.news.generated.resources.news_child_title
 
 @Composable
-fun NewsChildScreen(onBack: () -> Unit) {
+fun ArticleRouteScreen(
+    articleId: Long,
+    onBack: () -> Unit,
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -25,9 +24,9 @@ fun NewsChildScreen(onBack: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(Res.string.news_child_title))
+            Text("ArticleRouteScreen #$articleId")
             Button(onClick = onBack) {
-                Text(stringResource(Res.string.news_back))
+                Text("返回")
             }
         }
     }

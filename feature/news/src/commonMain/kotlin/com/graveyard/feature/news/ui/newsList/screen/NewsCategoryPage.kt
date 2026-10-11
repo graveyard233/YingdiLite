@@ -1,4 +1,4 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.screen
 
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -39,6 +39,7 @@ internal fun NewsCategoryPage(
     isCurrentPage: (Int) -> Boolean,
     onPageVisited: (Int) -> Unit,
     onShowRefreshFailure: (Int, String) -> Unit,
+    onArticleClick: (Long) -> Unit,
 ) {
     val banners = remember(viewModel, tagId) {
         viewModel.uiState.map { state ->
@@ -123,6 +124,7 @@ internal fun NewsCategoryPage(
                     job.start()
                 }
             },
+            onArticleClick = onArticleClick,
         )
     }
 }

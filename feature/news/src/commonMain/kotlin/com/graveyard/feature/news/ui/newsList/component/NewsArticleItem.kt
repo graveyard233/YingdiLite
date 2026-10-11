@@ -1,6 +1,7 @@
-package com.graveyard.feature.news.ui
+package com.graveyard.feature.news.ui.newsList.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import yingdilite.feature.news.generated.resources.news_comments
 internal fun NewsArticleItem(
     article: NewsArticle,
     nowEpochSeconds: Long,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = article.tags.firstOrNull().orEmpty()
@@ -46,6 +48,7 @@ internal fun NewsArticleItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {},
     ) {
         Row(

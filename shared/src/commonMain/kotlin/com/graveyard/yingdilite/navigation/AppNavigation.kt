@@ -1,5 +1,9 @@
 package com.graveyard.yingdilite.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -38,15 +42,16 @@ import com.graveyard.feature.mine.navigation.MineChildRoute
 import com.graveyard.feature.mine.navigation.MineRoute
 import com.graveyard.feature.mine.ui.MineChildScreen
 import com.graveyard.feature.mine.ui.MineScreen
+import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.NewsChildRoute
 import com.graveyard.feature.news.navigation.NewsRoute
-import com.graveyard.feature.news.ui.NewsChildScreen
-import com.graveyard.feature.news.ui.NewsRouteScreen
+import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRouteScreen
+import com.graveyard.feature.news.ui.newsList.screen.NewsChildScreen
+import com.graveyard.feature.news.ui.newsList.screen.NewsRouteScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 
 private val topLevelDestinations = listOf(
     TopLevelDestination(NewsRoute, "新闻", icon = AppIcon.News, selectedIcon = AppIcon.NewsFill),
@@ -57,9 +62,11 @@ private val topLevelDestinations = listOf(
 
 private val topLevelKeys = topLevelDestinations.map(TopLevelDestination::key)
 
-private val hiddenBottomBarRoutes = setOf<NavKey>(
-    CardsChildRoute,
-    MineChildRoute,
+// 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型隐藏底部栏。
+private val hiddenBottomBarRouteTypes = setOf(
+    CardsChildRoute::class,
+    MineChildRoute::class,
+    ArticleRoute::class,
 )
 
 @Composable
@@ -72,6 +79,7 @@ fun AppNavigation(
             serializersModule = SerializersModule {
                 polymorphic(NavKey::class) {
                     subclass(NewsRoute::class, NewsRoute.serializer())
+                    subclass(ArticleRoute::class, ArticleRoute.serializer())
                     subclass(NewsChildRoute::class, NewsChildRoute.serializer())
                     subclass(CommunityRoute::class, CommunityRoute.serializer())
                     subclass(CommunityChildRoute::class, CommunityChildRoute.serializer())
@@ -154,7 +162,7 @@ fun AppNavigation(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            if (navigationState.currentKey !in hiddenBottomBarRoutes) {
+            if (navigationState.currentKey::class !in hiddenBottomBarRouteTypes) {
                 AppBottomBar(
                     darkTheme = darkTheme,
                     currentKey = navigationState.currentTopLevelKey,
@@ -168,11 +176,38 @@ fun AppNavigation(
             entries = entries,
             onBack = ::handleBack,
             modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
+            transitionSpec = {
+                slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                ) togetherWith slideOutHorizontally(
+                    targetOffsetX = { -it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                )
+            },
+            popTransitionSpec = {
+                slideInHorizontally(
+                    initialOffsetX = { -it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                ) togetherWith slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                )
+            },
+            predictivePopTransitionSpec = {
+                slideInHorizontally(
+                    initialOffsetX = { -it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                ) togetherWith slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
+                )
+            },
         )
         if (onExit != null) {
             NavigationBackHandler(
                 state = appBackHandlerState,
-                isBackEnabled = true,
+                isBackEnabled = onExit != null && !navigationState.canGoBack,
                 onBackCancelled = {},
                 onBackCompleted = ::handleBack,
             )
@@ -181,6 +216,7 @@ fun AppNavigation(
 }
 
 private const val ROOT_BACK_CONFIRMATION_WINDOW_MILLIS = 2_000L
+private const val NAVIGATION_TRANSITION_DURATION_MILLIS = 300
 
 private object AppNavigationEventInfo : NavigationEventInfo()
 
@@ -191,7 +227,14 @@ private fun AppNavEntry(
     onShowMessage: suspend (String) -> Unit,
 ) {
     when (key) {
-        NewsRoute -> NewsRouteScreen(onShowMessage = onShowMessage)
+        NewsRoute -> NewsRouteScreen(
+            onShowMessage = onShowMessage,
+            onArticleClick = { articleId -> navigator.navigate(ArticleRoute(articleId)) },
+        )
+        is ArticleRoute -> ArticleRouteScreen(
+            articleId = key.articleId,
+            onBack = navigator::goBack,
+        )
         NewsChildRoute -> NewsChildScreen(navigator::goBack)
         CommunityRoute -> CommunityScreen { navigator.navigate(CommunityChildRoute) }
         CommunityChildRoute -> CommunityChildScreen(navigator::goBack)
