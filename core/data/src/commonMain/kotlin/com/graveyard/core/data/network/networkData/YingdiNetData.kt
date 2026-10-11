@@ -2,6 +2,7 @@ package com.graveyard.core.data.network.networkData
 
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.network.model.NewsListResponse
+import com.graveyard.core.data.network.model.TagDetail
 import com.graveyard.core.data.network.model.TopContentResponse
 import com.graveyard.core.data.network.sign.YingdiSignedForm
 import com.graveyard.core.data.result.DataError
@@ -65,8 +66,17 @@ internal class YingdiNetData(
         return response.decodeResponse(expectedArrayField = "list")
     }
 
+    override suspend fun getTagList(): List<TagDetail> {
+        val url = "$commonBaseUrl/web/tag/main-tag-bar"
+        val response = client.post(url) {
+            setBody(YingdiSignedForm.of())
+        }
+
+        return response.decodeResponse()
+    }
+
     private suspend inline fun <reified T> HttpResponse.decodeResponse(
-        expectedArrayField: String,
+        expectedArrayField: String? = null,
     ): T {
         if (!status.isSuccess()) {
             throw DataException(DataError.Http(statusCode = status.value))
@@ -76,23 +86,40 @@ internal class YingdiNetData(
         currentCoroutineContext().ensureActive()
         return withContext(Dispatchers.Default) {
             currentCoroutineContext().ensureActive()
-            val payload = json.parseToJsonElement(body) as? JsonObject
-                ?: throw DataException(DataError.Parsing)
-
-            // DTO defaults must not turn error envelopes into successful empty lists.
-            if (expectedArrayField !in payload) {
-                if ("retCode" in payload || "retMsg" in payload) {
-                    throw DataException(
-                        DataError.Business(
-                            retCode = (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
-                            retMsg = (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
-                        ),
-                    )
+            val payload = json.parseToJsonElement(body)
+            when (payload) {
+                is JsonObject -> {
+                    if (expectedArrayField != null) {
+                        // DTO defaults must not turn error envelopes into successful empty lists.
+                        if (expectedArrayField !in payload) {
+                            if ("retCode" in payload || "retMsg" in payload) {
+                                throw DataException(
+                                    DataError.Business(
+                                        retCode = (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
+                                        retMsg = (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
+                                    ),
+                                )
+                            }
+                            throw DataException(DataError.Parsing)
+                        }
+                        if (payload[expectedArrayField] !is JsonArray) {
+                            throw DataException(DataError.Parsing)
+                        }
+                    } else if ("retCode" in payload || "retMsg" in payload) {
+                        throw DataException(
+                            DataError.Business(
+                                retCode = (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
+                                retMsg = (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
+                            ),
+                        )
+                    }
                 }
-                throw DataException(DataError.Parsing)
-            }
-            if (payload[expectedArrayField] !is JsonArray) {
-                throw DataException(DataError.Parsing)
+                is JsonArray -> {
+                    if (expectedArrayField != null) {
+                        throw DataException(DataError.Parsing)
+                    }
+                }
+                else -> throw DataException(DataError.Parsing)
             }
 
             currentCoroutineContext().ensureActive()

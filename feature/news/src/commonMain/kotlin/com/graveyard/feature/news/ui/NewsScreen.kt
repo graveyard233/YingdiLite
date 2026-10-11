@@ -33,12 +33,13 @@ import androidx.paging.compose.itemKey
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.feature.news.model.NewsCategory
+import com.graveyard.core.model.news.TagInfo
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.news_banners_load_failed
 import yingdilite.feature.news.generated.resources.news_load_failed
+import yingdilite.feature.news.generated.resources.news_manage_tags
 import yingdilite.feature.news.generated.resources.news_search
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -46,10 +47,11 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsScreen(
-    categories: List<NewsCategory>,
+    categories: List<TagInfo>,
     pagerState: PagerState,
-    onSelectCategory: (NewsCategory) -> Unit,
-    pageContent: @Composable (NewsCategory) -> Unit,
+    onManageTags: () -> Unit,
+    onSelectCategory: (TagInfo) -> Unit,
+    pageContent: @Composable (TagInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -65,6 +67,17 @@ fun NewsScreen(
         topBar = {
             Column {
                 TopAppBar(
+                    navigationIcon = {
+                        IconButton(
+                            modifier = Modifier,
+                            onClick = onManageTags,
+                        ) {
+                            Icon(
+                                imageVector = AppIcon.Menu.imageVector,
+                                contentDescription = stringResource(Res.string.news_manage_tags),
+                            )
+                        }
+                    },
                     title = {
                         PrimaryScrollableTabRow(
                             selectedTabIndex = selectedTabIndex,
@@ -75,7 +88,7 @@ fun NewsScreen(
                                 Tab(
                                     selected = index == selectedTabIndex,
                                     onClick = { onSelectCategory(category) },
-                                    text = { Text(category.label) },
+                                    text = { Text(category.title) },
                                 )
                             }
                         }
@@ -100,9 +113,13 @@ fun NewsScreen(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                key = { page -> categories[page].id },
+                // A previous layout/prefetch may briefly retain an index after tags change.
+                // String keys cannot collide with the valid tags' Int IDs.
+                key = { page -> categories.getOrNull(page)?.id ?: "news-page-$page" },
             ) { page ->
-                pageContent(categories[page])
+                categories.getOrNull(page)?.let { category ->
+                    pageContent(category)
+                }
             }
         }
     }

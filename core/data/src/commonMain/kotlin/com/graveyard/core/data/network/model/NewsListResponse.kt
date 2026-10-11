@@ -75,8 +75,8 @@ internal data class NewsFeed(
 /**
  * 新闻标签条目。
  *
- * 既是接口 `tag_json` 的二次解析 DTO，也作为本地用户设置（订阅标签列表）的存储模型，
- * JSON 形状固定为 `{"tag": <名称>, "id": <ID>}`；新增字段必须带默认值以兼容旧数据。
+ * 用于接口 `tag_json` 的二次解析，JSON 形状为 `{"tag": <名称>, "id": <ID>}`。
+ * 用户订阅和全量标签缓存使用 core:model 中的 TagInfo。
  */
 @Serializable
 data class NewsArticleTag(

@@ -22,7 +22,7 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.feature.news.model.validateNewsCategories
+import com.graveyard.feature.news.viewmodel.NewsTagEditor
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
@@ -30,16 +30,22 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_tags_save_failed
 
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
-    val categories by viewModel.categories.collectAsState()
+    // Capture this composition's list once. A delegated read in pageCount would see
+    // a new list before the pager's key/content callbacks have recomposed.
+    val categories = viewModel.categories.collectAsState().value
+    val tagEditor = viewModel.tagEditor
+    val saveFailureMessage by rememberUpdatedState(stringResource(Res.string.news_tags_save_failed))
     val categoryIds = remember(categories) {
-        validateNewsCategories(categories)
         categories.map { it.id }
     }
     val selectedTagIds = remember(viewModel) {
@@ -52,6 +58,9 @@ fun NewsRouteScreen(
     val currentTagId by rememberUpdatedState(activeTagId)
     val currentCategoryIds by rememberUpdatedState(categoryIds)
     val showMessage by rememberUpdatedState(onShowMessage)
+    LaunchedEffect(tagEditor) {
+        tagEditor.messages.collect { showMessage(saveFailureMessage) }
+    }
     val stateHolder = rememberSaveableStateHolder()
     val pagerState = rememberPagerState(
         initialPage = categoryIds.indexOf(activeTagId),
@@ -75,6 +84,14 @@ fun NewsRouteScreen(
             !isSynchronizingPager &&
             !pagerState.isScrollInProgress &&
             currentCategoryIds.getOrNull(pagerState.settledPage) == tagId
+    }
+    val onSelectTag: (Int) -> Unit = { tagId ->
+        messageJob?.cancel()
+        isSynchronizingPager = true
+        requestedTagId = tagId
+        pagerNavigationRequest++
+        visitedTagIds = (visitedTagIds + tagId).distinct()
+        viewModel.selectTag(tagId)
     }
 
     LaunchedEffect(categoryIds) {
@@ -155,14 +172,8 @@ fun NewsRouteScreen(
     NewsScreen(
         categories = categories,
         pagerState = pagerState,
-        onSelectCategory = { category ->
-            messageJob?.cancel()
-            isSynchronizingPager = true
-            requestedTagId = category.id
-            pagerNavigationRequest++
-            visitedTagIds = (visitedTagIds + category.id).distinct()
-            viewModel.selectTag(category.id)
-        },
+        onManageTags = tagEditor::open,
+        onSelectCategory = { category -> onSelectTag(category.id) },
         pageContent = { category ->
             NewsCategoryPage(
                 tagId = category.id,
@@ -184,6 +195,52 @@ fun NewsRouteScreen(
             )
         },
     )
+
+    NewsTagEditorHost(
+        tagEditor = tagEditor,
+        onRefresh = viewModel::getTagInfos,
+        onSelectTag = onSelectTag,
+    )
+}
+
+@Composable
+private fun NewsTagEditorHost(
+    tagEditor: NewsTagEditor,
+    onRefresh: () -> Unit,
+    onSelectTag: (Int) -> Unit,
+) {
+    val state by tagEditor.state.collectAsState()
+    // The host owns observation for the route lifetime. A sheet's visibility
+    // transition must not dispose an old close callback after a rapid reopening.
+    DisposableEffect(tagEditor) {
+        onDispose { tagEditor.close() }
+    }
+    if (state.isVisible) {
+        NewsTagEditorSheet(
+            state = state,
+            onDismiss = tagEditor::close,
+            onRetryInitialization = tagEditor::retryInitialization,
+            onRefresh = {
+                val current = tagEditor.state.value
+                if (current.canAddOrRemove && !current.isRefreshing) {
+                    onRefresh()
+                }
+            },
+            onSelect = { tagId ->
+                val current = tagEditor.state.value
+                if (current.canAddOrRemove && current.userTags.any { it.id == tagId }) {
+                    onSelectTag(tagId)
+                    tagEditor.close()
+                }
+            },
+            onAdd = tagEditor::add,
+            onRemove = tagEditor::remove,
+            onDragStarted = tagEditor::startDrag,
+            onMove = tagEditor::move,
+            onDragStopped = tagEditor::finishDrag,
+            onMoveBy = tagEditor::moveBy,
+        )
+    }
 }
 
 @Composable

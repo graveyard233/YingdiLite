@@ -68,6 +68,7 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
+                implementation(libs.reorderable)
                 implementation(libs.androidx.navigation3.ui)
                 implementation(libs.androidx.paging.compose)
                 implementation(libs.kotlinx.serialization.json)
@@ -89,6 +90,7 @@ kotlin {
                 implementation(project(":core:designsystem"))
 
                 implementation(project(":core:data"))
+                implementation(project(":core:utils"))
             }
         }
     }

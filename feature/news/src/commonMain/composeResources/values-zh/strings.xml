@@ -5,6 +5,27 @@
     <string name="news_retry">重试</string>
     <string name="news_search">搜索</string>
 
+    <!-- 标签管理 -->
+    <string name="news_manage_tags">标签管理</string>
+    <string name="news_tags_close">关闭标签管理</string>
+    <string name="news_tags_hint">修改自动保存，至少保留一个标签</string>
+    <string name="news_tags_my">我的标签 · %1$d</string>
+    <string name="news_tags_more">更多标签</string>
+    <string name="news_tags_missing">未出现在最新列表</string>
+    <string name="news_tags_add">添加%1$s</string>
+    <string name="news_tags_remove">移除%1$s</string>
+    <string name="news_tags_reorder">拖拽排序%1$s</string>
+    <string name="news_tags_move_up">向上移动</string>
+    <string name="news_tags_move_down">向下移动</string>
+    <string name="news_tags_all_added">已添加全部标签</string>
+    <string name="news_tags_loading">正在读取标签…</string>
+    <string name="news_tags_refresh">更新可选标签</string>
+    <string name="news_tags_refreshing">正在更新可选标签…</string>
+    <string name="news_tags_saving">保存中…</string>
+    <string name="news_tags_initialization_failed">标签设置读取失败</string>
+    <string name="news_tags_refresh_failed">标签更新失败，已保留原列表</string>
+    <string name="news_tags_save_failed">修改保存失败，已恢复保存的标签</string>
+
     <!-- 新闻列表项 -->
     <string name="news_comments">%1$s 评论</string>
     <string name="news_reply_count_large">%1$d万+</string>

@@ -5,6 +5,27 @@
     <string name="news_retry">Retry</string>
     <string name="news_search">Search</string>
 
+    <!-- Tag management -->
+    <string name="news_manage_tags">Manage tags</string>
+    <string name="news_tags_close">Close tag management</string>
+    <string name="news_tags_hint">Changes save automatically. Keep at least one tag.</string>
+    <string name="news_tags_my">My tags · %1$d</string>
+    <string name="news_tags_more">More tags</string>
+    <string name="news_tags_missing">Not in the latest list</string>
+    <string name="news_tags_add">Add %1$s</string>
+    <string name="news_tags_remove">Remove %1$s</string>
+    <string name="news_tags_reorder">Reorder %1$s</string>
+    <string name="news_tags_move_up">Move up</string>
+    <string name="news_tags_move_down">Move down</string>
+    <string name="news_tags_all_added">All tags added</string>
+    <string name="news_tags_loading">Loading tags…</string>
+    <string name="news_tags_refresh">Update available tags</string>
+    <string name="news_tags_refreshing">Updating available tags…</string>
+    <string name="news_tags_saving">Saving…</string>
+    <string name="news_tags_initialization_failed">Could not read your tags.</string>
+    <string name="news_tags_refresh_failed">Could not update tags. Showing previous tags.</string>
+    <string name="news_tags_save_failed">Could not save changes. Restored your saved tags.</string>
+
     <!-- Article item -->
     <string name="news_comments">%1$s comments</string>
     <string name="news_reply_count_large">%1$d0k+</string>

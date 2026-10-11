@@ -1,6 +1,7 @@
 package com.graveyard.core.data.network
 
 import com.graveyard.core.data.network.model.NewsListResponse
+import com.graveyard.core.data.network.model.TagDetail
 import com.graveyard.core.data.network.model.TopContentResponse
 
 internal interface YingdiData {
@@ -13,4 +14,6 @@ internal interface YingdiData {
         tagId: Int,
         version: Long = 0L,
     ): NewsListResponse
+
+    suspend fun getTagList(): List<TagDetail>
 }

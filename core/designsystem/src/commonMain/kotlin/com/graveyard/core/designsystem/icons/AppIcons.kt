@@ -24,4 +24,9 @@ enum class AppIcon(val imageVector: ImageVector) {
     Comment(commentIcon),
     Image(imageIcon),
     Refresh(refreshIcon),
+    Menu(menu),
+    DragHandle(dragHandle),
+    Add(addIcon),
+    Close(closeIcon),
+    Sync(sync)
 }

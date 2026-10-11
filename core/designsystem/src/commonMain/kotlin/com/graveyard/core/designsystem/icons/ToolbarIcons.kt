@@ -44,6 +44,18 @@ internal val refreshIcon = toolbarIcon(
     "M17.65,6.35A8,8 0,1 0,20,12H18a6,6 0,1 1,-1.76,-4.24L13,11h8V3Z",
 )
 
+// Google Material Icons, 24px (Apache 2.0).
+internal val addIcon = toolbarIcon(
+    "Add",
+    "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+)
+
+internal val closeIcon = toolbarIcon(
+    "Close",
+    "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 " +
+        "5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+)
+
 private fun toolbarIcon(name: String, path: String): ImageVector =
     ImageVector.Builder(
         name = name,

@@ -7,7 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 
-internal fun Exception.toDataException(): DataException {
+fun Exception.toDataException(): DataException {
     val error = when (this) {
         is CancellationException -> throw this
         is DataException -> return this
