@@ -253,10 +253,11 @@ private fun AppNavEntry(
     when (key) {
         NewsRoute -> NewsRouteScreen(
             onShowMessage = onShowMessage,
-            onArticleClick = { articleId -> navigator.navigate(ArticleRoute(articleId)) },
+            onArticleClick = { articleId,articleTitle -> navigator.navigate(ArticleRoute(articleId,articleTitle)) },
         )
         is ArticleRoute -> ArticleRouteScreen(
             articleId = key.articleId,
+            articleTitle = key.articleTitle,
             onBack = navigator::goBack,
         )
         NewsChildRoute -> NewsChildScreen(navigator::goBack)

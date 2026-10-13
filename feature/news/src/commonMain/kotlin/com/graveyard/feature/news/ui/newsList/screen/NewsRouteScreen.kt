@@ -38,7 +38,7 @@ import yingdilite.feature.news.generated.resources.news_tags_save_failed
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
-    onArticleClick: (Long) -> Unit,
+    onArticleClick: (String, String) -> Unit,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
     // Capture this composition's list once. A delegated read in pageCount would see

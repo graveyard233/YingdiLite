@@ -39,7 +39,7 @@ internal fun NewsCategoryPage(
     isCurrentPage: (Int) -> Boolean,
     onPageVisited: (Int) -> Unit,
     onShowRefreshFailure: (Int, String) -> Unit,
-    onArticleClick: (Long) -> Unit,
+    onArticleClick: (String, String) -> Unit,
 ) {
     val banners = remember(viewModel, tagId) {
         viewModel.uiState.map { state ->

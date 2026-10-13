@@ -28,5 +28,7 @@ enum class AppIcon(val imageVector: ImageVector) {
     DragHandle(dragHandle),
     Add(addIcon),
     Close(closeIcon),
-    Sync(sync)
+    Sync(sync),
+    ArrowBack(arrowBack),
+    MoreVert(moreVert),
 }
