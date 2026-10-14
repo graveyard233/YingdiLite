@@ -142,6 +142,7 @@ internal fun NewsPage(
     onRetryBanners: () -> Unit,
     onRefresh: () -> Unit,
     onArticleClick: (String, String) -> Unit,
+    selectedArticleId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val nowEpochSeconds = Clock.System.now().epochSeconds
@@ -219,6 +220,7 @@ internal fun NewsPage(
                     newsItems[index]?.let { article ->
                         NewsArticleItem(
                             article = article,
+                            selected = article.sourceId == selectedArticleId,
                             nowEpochSeconds = nowEpochSeconds,
                             onClick = { onArticleClick(article.sourceId,article.title) },
                             modifier = Modifier.animateItem(),

@@ -23,7 +23,6 @@ import org.koin.dsl.koinConfiguration
 @Composable
 fun App(
     dataStore: DataStore<Preferences>,
-    onExit: (() -> Unit)? = null,
     enableNetworkDiagnosticBodies: Boolean = false,
 ) {
     val darkTheme = isSystemInDarkTheme()
@@ -51,7 +50,6 @@ fun App(
         AppTheme(darkTheme = darkTheme) {
             AppNavigation(
                 darkTheme = darkTheme,
-                onExit = onExit,
             )
         }
     }

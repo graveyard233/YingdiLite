@@ -20,9 +20,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.LayoutModifierNode
@@ -36,13 +39,16 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneDecoratorStrategy
 import androidx.navigation3.scene.SceneDecoratorStrategyScope
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import com.graveyard.yingdilite.navigation.news.scenePresentation
 
 internal const val APP_NAVIGATION_SCENE_KEY = "com.graveyard.yingdilite.navigation.hasNavigation"
+internal val LocalSceneInteractive = staticCompositionLocalOf { true }
 
 @Composable
 internal fun rememberAppNavigationSceneDecoratorStrategy(
     layoutType: NavigationSuiteType,
     targetHasNavigation: Boolean,
+    onNavigationSizeChanged: (IntSize) -> Unit,
     navigationSuite: @Composable () -> Unit,
     snackbarHost: @Composable () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
@@ -50,6 +56,7 @@ internal fun rememberAppNavigationSceneDecoratorStrategy(
     val currentNavigationSuite by rememberUpdatedState(navigationSuite)
     val currentSnackbarHost by rememberUpdatedState(snackbarHost)
     val currentTargetHasNavigation by rememberUpdatedState(targetHasNavigation)
+    val currentOnSizeChanged by rememberUpdatedState(onNavigationSizeChanged)
     val movableNavigationSuite = remember { movableContentOf { currentNavigationSuite() } }
     val movableSnackbarHost = remember { movableContentOf { currentSnackbarHost() } }
 
@@ -60,6 +67,7 @@ internal fun rememberAppNavigationSceneDecoratorStrategy(
             navigationSuite = movableNavigationSuite,
             snackbarHost = movableSnackbarHost,
             targetHasNavigation = { currentTargetHasNavigation },
+            onNavigationSizeChanged = { currentOnSizeChanged(it) },
         )
     }
 }
@@ -70,14 +78,12 @@ private class AppNavigationSceneDecoratorStrategy(
     private val navigationSuite: @Composable () -> Unit,
     private val snackbarHost: @Composable () -> Unit,
     private val targetHasNavigation: () -> Boolean,
+    private val onNavigationSizeChanged: (IntSize) -> Unit,
 ) : SceneDecoratorStrategy<NavKey> {
     override fun SceneDecoratorStrategyScope<NavKey>.decorateScene(
         scene: Scene<NavKey>,
     ): Scene<NavKey> {
         // 判断当前场景自身，而不是变化后的全局 currentKey；离场场景保留原导航栏。
-        if (scene.entries.singleOrNull()?.metadata?.get(APP_NAVIGATION_SCENE_KEY) != true) {
-            return scene
-        }
         return AppNavigationScene(
             scene = scene,
             layoutType = layoutType,
@@ -85,6 +91,7 @@ private class AppNavigationSceneDecoratorStrategy(
             navigationSuite = navigationSuite,
             snackbarHost = snackbarHost,
             targetHasNavigation = targetHasNavigation,
+            onNavigationSizeChanged = onNavigationSizeChanged,
         )
     }
 }
@@ -97,6 +104,7 @@ private data class AppNavigationScene(
     private val navigationSuite: @Composable () -> Unit,
     private val snackbarHost: @Composable () -> Unit,
     private val targetHasNavigation: () -> Boolean,
+    private val onNavigationSizeChanged: (IntSize) -> Unit,
 ) : Scene<NavKey> by scene {
     override val key: Any = scene::class to scene.key
 
@@ -106,6 +114,8 @@ private data class AppNavigationScene(
         val drawSharedContent =
             animatedContentScope.transition.targetState == EnterExitState.Visible ||
                 !targetHasNavigation()
+        val isTarget = animatedContentScope.transition.targetState == EnterExitState.Visible
+        val hasNavigation = scenePresentation(scene).showsApplicationNavigation
         val consumedInsets = when (layoutType) {
             NavigationSuiteType.NavigationBar ->
                 NavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom)
@@ -116,10 +126,11 @@ private data class AppNavigationScene(
 
         with(sharedTransitionScope) {
             NavigationSuiteScaffoldLayout(
-                layoutType = layoutType,
+                layoutType = if (hasNavigation) layoutType else NavigationSuiteType.None,
                 navigationSuite = {
-                    Box(
+                    if (hasNavigation) Box(
                         Modifier
+                            .onSizeChanged { if (hasNavigation && drawSharedContent) onNavigationSizeChanged(it) }
                             .cacheNavigationSize(!drawSharedContent)
                             .sharedElement(
                                 rememberSharedContentState(
@@ -132,13 +143,15 @@ private data class AppNavigationScene(
                                 animatedContentScope,
                             ),
                     ) {
-                        if (drawSharedContent) navigationSuite()
+                        if (hasNavigation && drawSharedContent) navigationSuite()
                     }
                 },
             ) {
-                Box(Modifier.fillMaxSize().consumeWindowInsets(consumedInsets)) {
-                    scene.content()
-                    if (drawSharedContent) {
+                Box(Modifier.fillMaxSize().then(if (hasNavigation) Modifier.consumeWindowInsets(consumedInsets) else Modifier)) {
+                    CompositionLocalProvider(LocalSceneInteractive provides isTarget) {
+                        scene.content()
+                    }
+                    if (isTarget) {
                         Box(
                             Modifier
                                 .align(Alignment.BottomCenter)

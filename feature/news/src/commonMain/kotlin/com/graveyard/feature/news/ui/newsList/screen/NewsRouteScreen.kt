@@ -4,6 +4,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -24,6 +25,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.feature.news.ui.newsList.component.NewsTagEditorSheet
 import com.graveyard.feature.news.viewmodel.NewsTagEditor
+import com.graveyard.feature.news.navigation.NewsPresentation
+import com.graveyard.feature.news.navigation.LocalNewsPresentation
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -39,6 +42,7 @@ import yingdilite.feature.news.generated.resources.news_tags_save_failed
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
     onArticleClick: (String, String) -> Unit,
+    presentation: NewsPresentation = LocalNewsPresentation.current,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
     // Capture this composition's list once. A delegated read in pageCount would see
@@ -55,7 +59,10 @@ fun NewsRouteScreen(
     val selectedTagId by selectedTagIds.collectAsState(
         initial = viewModel.uiState.value.selectedTagId,
     )
-    val activeTagId = selectedTagId?.takeIf { it in categoryIds } ?: categoryIds.first()
+    // A recreated ViewModel has no selection yet; restore the category by ID, not pager index.
+    var savedTagId by rememberSaveable { mutableStateOf(selectedTagId) }
+    val activeTagId = (selectedTagId ?: savedTagId)?.takeIf { it in categoryIds } ?: categoryIds.first()
+    SideEffect { savedTagId = activeTagId }
     val currentTagId by rememberUpdatedState(activeTagId)
     val currentCategoryIds by rememberUpdatedState(categoryIds)
     val showMessage by rememberUpdatedState(onShowMessage)
@@ -71,7 +78,11 @@ fun NewsRouteScreen(
     val pagingItemsByTag = remember(viewModel) {
         mutableStateMapOf<Int, LazyPagingItems<NewsArticle>>()
     }
-    val refreshJobs = remember { mutableStateMapOf<Int, Job>() }
+    val refreshingTags by viewModel.refreshingTags.collectAsState()
+    val currentPresentation by rememberUpdatedState(presentation)
+    LaunchedEffect(presentation.interactive, presentation.listVisible) {
+        if (!presentation.interactive || !presentation.listVisible) tagEditor.close()
+    }
     var messageJob by remember { mutableStateOf<Job?>(null) }
     var visitedTagIds by rememberSaveable { mutableStateOf(emptyList<Int>()) }
     var previousCategoryIds by rememberSaveable { mutableStateOf(categoryIds) }
@@ -81,7 +92,7 @@ fun NewsRouteScreen(
     var pagerNavigationRequest by remember { mutableStateOf(0) }
 
     val isCurrentPage: (Int) -> Boolean = { tagId ->
-        currentTagId == tagId &&
+        currentPresentation.interactive && currentPresentation.listVisible && currentTagId == tagId &&
             !isSynchronizingPager &&
             !pagerState.isScrollInProgress &&
             currentCategoryIds.getOrNull(pagerState.settledPage) == tagId
@@ -98,12 +109,12 @@ fun NewsRouteScreen(
     LaunchedEffect(categoryIds) {
         val removedIds = previousCategoryIds.filter { it !in categoryIds }
         removedIds.forEach { tagId ->
-            refreshJobs.remove(tagId)?.cancel()
             pagingItemsByTag.remove(tagId)
             stateHolder.removeState(tagId)
         }
         visitedTagIds = visitedTagIds.filter { it in categoryIds }
         previousCategoryIds = categoryIds
+        viewModel.selectTag(activeTagId)
         viewModel.updateCategories(categoryIds)
     }
     LaunchedEffect(activeTagId) {
@@ -146,8 +157,6 @@ fun NewsRouteScreen(
     DisposableEffect(Unit) {
         onDispose {
             messageJob?.cancel()
-            refreshJobs.values.toList().forEach { it.cancel() }
-            refreshJobs.clear()
         }
     }
 
@@ -180,9 +189,8 @@ fun NewsRouteScreen(
                 tagId = category.id,
                 viewModel = viewModel,
                 pagingItemsByTag = pagingItemsByTag,
-                refreshJobs = refreshJobs,
+                isRefreshing = category.id in refreshingTags,
                 stateHolder = stateHolder,
-                scope = scope,
                 isCurrentPage = isCurrentPage,
                 onPageVisited = { tagId ->
                     visitedTagIds = (visitedTagIds + tagId).distinct()
@@ -193,12 +201,15 @@ fun NewsRouteScreen(
                         if (isCurrentPage(tagId)) showMessage(message)
                     }
                 },
-                onArticleClick = onArticleClick,
+                onArticleClick = { id, title ->
+                    if (currentPresentation.interactive) onArticleClick(id, title)
+                },
+                selectedArticleId = presentation.selectedArticleId,
             )
         },
     )
 
-    NewsTagEditorHost(
+    if (presentation.interactive && presentation.listVisible) NewsTagEditorHost(
         tagEditor = tagEditor,
         onRefresh = viewModel::getTagInfos,
         onSelectTag = onSelectTag,

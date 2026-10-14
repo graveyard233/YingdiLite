@@ -20,7 +20,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             App(
                 dataStore = dataStore,
-                onExit = { moveTaskToBack(true) },
                 enableNetworkDiagnosticBodies =
                     applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
             )

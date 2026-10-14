@@ -64,4 +64,5 @@
     <string name="article_back_to_detail">Back to article</string>
     <string name="article_more">More</string>
     <string name="news_child_title">News subpage</string>
+    <string name="article_close_selection">Close article</string>
 </resources>

@@ -11,7 +11,6 @@ fun MainViewController() = run {
     ComposeUIViewController {
         App(
             dataStore = dataStore,
-            onExit = null,
             enableNetworkDiagnosticBodies = Platform.isDebugBinary,
         )
     }

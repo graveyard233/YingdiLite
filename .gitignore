@@ -23,6 +23,9 @@ node_modules/
 /core/data/src/commonMain/kotlin/com/graveyard/core/data/crypto/
 /core/data/src/commonTest/kotlin/com/graveyard/core/data/
 
+
+shared/src/commonTest/
+
 # DSH 沙箱排查文件权限时产生的临时记录
 /.acl-recovery/
 

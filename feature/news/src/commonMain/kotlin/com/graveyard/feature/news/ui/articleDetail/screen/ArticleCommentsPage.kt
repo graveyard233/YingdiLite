@@ -25,6 +25,7 @@ import yingdilite.feature.news.generated.resources.article_comments_title
 internal fun ArticleCommentsPage(
     uiState: ArticleUiState,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -32,7 +33,7 @@ internal fun ArticleCommentsPage(
             TopAppBar(
                 title = { Text(stringResource(Res.string.article_comments_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    if (showBack) IconButton(onClick = onBack) {
                         Icon(
                             imageVector = AppIcon.ArrowBack.imageVector,
                             contentDescription = stringResource(Res.string.article_back_to_detail),

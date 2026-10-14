@@ -48,6 +48,8 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.material3.adaptive.navigation.suite)
+            implementation(libs.compose.material3.adaptive)
+            implementation(libs.androidx.navigationevent.compose)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
@@ -93,6 +95,9 @@ kotlin {
             implementation(project(":feature:community"))
             implementation(project(":feature:cards"))
             implementation(project(":feature:mine"))
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)

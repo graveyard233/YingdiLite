@@ -47,7 +47,7 @@ fun rememberNavigationState(
 /**
  * 导航状态的状态持有者。
  *
- * @param startKey - 起始导航键。用户将通过该键退出应用。
+ * @param startKey - 应用首次启动时选中的顶层导航键。
  * @param topLevelStack - 顶层返回栈，其中只保存顶层键。
  * @param subStacks - 每个顶层键对应的返回栈。
  */
@@ -77,7 +77,7 @@ class NavigationState(
 }
 
 /**
- * 将 NavigationState 转换为 NavEntries。
+ * 保留所有子栈的状态装饰器，只将当前 Tab 的子栈转换为供 NavDisplay 展示的 NavEntries。
  */
 @Composable
 fun NavigationState.toEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): SnapshotStateList<NavEntry<NavKey>> {
@@ -93,7 +93,6 @@ fun NavigationState.toEntries(entryProvider: (NavKey) -> NavEntry<NavKey>): Snap
         )
     }
 
-    return topLevelStack
-        .flatMap { decoratedEntries[it] ?: emptyList() }
-        .toMutableStateList()
+    // 其他 Tab 的历史条目不能成为当前场景的 previousEntries，否则根节点会拦截系统返回。
+    return decoratedEntries.getValue(currentTopLevelKey).toMutableStateList()
 }
