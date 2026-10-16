@@ -29,6 +29,7 @@ room3 = "3.0.3"
 sqlite = "2.7.1"
 ksp = "2.3.10"
 kotlinStdlib = "2.4.20"
+ksoup="0.2.6"
 runner = "1.5.2"
 core = "1.5.0"
 
@@ -59,6 +60,7 @@ androidx-navigationevent-compose = { module = "org.jetbrains.androidx.navigation
 androidx-lifecycle-viewmodelNavigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "androidx-lifecycle" }
 
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
@@ -85,6 +87,8 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3" }
 
 datastore-core = { module = "androidx.datastore:datastore-core", version.ref = "datastore" }
 datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastore" }
+
+ksoup-core = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
 
 androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }

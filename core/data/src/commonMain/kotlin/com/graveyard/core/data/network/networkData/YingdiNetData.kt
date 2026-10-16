@@ -1,5 +1,6 @@
 package com.graveyard.core.data.network.networkData
 
+import com.fleeksoft.ksoup.Ksoup
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.network.model.NewsListResponse
 import com.graveyard.core.data.network.model.TagDetail
@@ -8,10 +9,13 @@ import com.graveyard.core.data.network.sign.YingdiSignedForm
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataException
 import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -25,10 +29,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 
 /**
- * 营地 PC Web 接口的实现，请求体是 form 表单 + `sign` 签名。
+ * 营地数据源：PC Web 接口使用签名 form 表单并返回 JSON，移动站文章通过 GET 返回 HTML。
  *
- * 请求头、时间戳、签名和不带 charset 的 Content-Type 都由 `YingdiSignPlugin` 补齐，
- * 这里只写业务参数和响应解析。
+ * 签名表单的请求头、时间戳、签名和不带 charset 的 Content-Type 由 `YingdiSignPlugin` 补齐，
+ * HTML 请求单独设置 Accept，这里负责业务参数和响应解析。
  */
 internal class YingdiNetData(
     private val client: HttpClient,
@@ -36,6 +40,7 @@ internal class YingdiNetData(
 ) : YingdiData {
 
     private val commonBaseUrl: String = "https://api.iyingdi.com"
+    private val mobileBaseUrl: String = "https://mob.iyingdi.com"
 
     /** @param tagId 标签 id，例如首页运营位用 `99`。 */
     override suspend fun getBannerList(tagId: Int): TopContentResponse {
@@ -73,6 +78,27 @@ internal class YingdiNetData(
         }
 
         return response.decodeResponse()
+    }
+
+    override suspend fun getArticleContentHtml(postId: Long): String {
+        val url = "$mobileBaseUrl/post/$postId"
+        val response = client.get(url) {
+            accept(ContentType.Text.Html)
+        }
+        if (!response.status.isSuccess()) {
+            throw DataException(DataError.Http(statusCode = response.status.value))
+        }
+
+        val body = response.bodyAsText()
+        currentCoroutineContext().ensureActive()
+        return withContext(Dispatchers.Default) {
+            currentCoroutineContext().ensureActive()
+            val document = Ksoup.parse(html = body, baseUri = url)
+            val contentHtml = document.selectFirst(".rich-content")?.html()
+                ?: throw DataException(DataError.Parsing)
+            currentCoroutineContext().ensureActive()
+            contentHtml
+        }
     }
 
     private suspend inline fun <reified T> HttpResponse.decodeResponse(

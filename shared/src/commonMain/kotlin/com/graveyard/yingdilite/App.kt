@@ -10,6 +10,7 @@ import com.graveyard.core.data.di.repositoryModule
 import com.graveyard.core.data.local.di.localStorageModule
 import com.graveyard.core.data.network.di.networkModule
 import com.graveyard.core.designsystem.theme.AppTheme
+import com.graveyard.core.designsystem.webview.WebViewPoolProvider
 import com.graveyard.core.utils.logging.Logger
 import com.graveyard.feature.news.di.newsModule
 import com.graveyard.yingdilite.navigation.AppNavigation
@@ -48,9 +49,9 @@ fun App(
         },
     ) {
         AppTheme(darkTheme = darkTheme) {
-            AppNavigation(
-                darkTheme = darkTheme,
-            )
+            WebViewPoolProvider {
+                AppNavigation(darkTheme = darkTheme)
+            }
         }
     }
 }

@@ -23,4 +23,6 @@ interface NewsRepository {
      * 调用方等待编辑完成后，通过 UserSettings 原子提交目录和订阅元信息。
      */
     suspend fun refreshTagInfos(): DataResult<List<TagInfo>>
+
+    suspend fun getArticleContent(postId: Long): DataResult<ArticleContent>
 }

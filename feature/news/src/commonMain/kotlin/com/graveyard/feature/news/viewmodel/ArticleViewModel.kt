@@ -1,14 +1,22 @@
 package com.graveyard.feature.news.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.graveyard.core.data.repository.ArticleRepository
+import androidx.lifecycle.viewModelScope
+import com.graveyard.core.data.repository.NewsRepository
+import com.graveyard.core.data.result.DataError
+import com.graveyard.core.data.result.DataResult
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 class ArticleViewModel(
-    private val repository: ArticleRepository,
-    articleId: String,
+    private val repository: NewsRepository,
+    private val articleId: String,
     articleTitle: String,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(
@@ -18,9 +26,24 @@ class ArticleViewModel(
         ),
     )
     val uiState: StateFlow<ArticleUiState> = mutableUiState.asStateFlow()
+    private var request: Job? = null
+
+    init { loadArticle() }
 
     fun loadArticle() {
-        // Reserved for the article detail request.
+        request?.cancel()
+        mutableUiState.update { it.copy(isLoading = true, error = null) }
+        request = viewModelScope.launch {
+            val id = articleId.toLongOrNull()?.takeIf { it > 0 }
+            val result = if (id == null) DataResult.Failure(DataError.Parsing) else repository.getArticleContent(id)
+            currentCoroutineContext().ensureActive()
+            mutableUiState.update {
+                when (result) {
+                    is DataResult.Success -> it.copy(content = result.data, isLoading = false, error = null)
+                    is DataResult.Failure -> it.copy(content = null, isLoading = false, error = result.error)
+                }
+            }
+        }
     }
 
     fun loadComments() {

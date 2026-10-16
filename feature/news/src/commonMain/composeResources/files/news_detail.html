@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base id="content-base" href="about:blank">
+<style>
+:root { color-scheme: light dark; --background: #fff; --foreground: #202124; --link: #176b55; }
+@media(prefers-color-scheme:dark) { :root { --background:#171717; --foreground:#e8e8e8; --link:#8fd9bc; } }
+* { box-sizing:border-box; }
+html { background:var(--background); color:var(--foreground); overflow-wrap:anywhere; }
+body { margin:0; padding:16px; font:17px/1.75 system-ui,sans-serif; letter-spacing:0; }
+#content { min-width:0; }
+p { margin:0 0 1em; }
+a { color:var(--link); }
+img { max-width:100% !important; height:auto !important; }
+video,iframe { max-width:100% !important; }
+figure { margin:1em 0; }
+pre,.table-scroll { max-width:100%; overflow-x:auto; }
+pre { white-space:pre; font-size:14px; }
+table { border-collapse:collapse; }
+td,th { border:1px solid currentColor; padding:6px 10px; }
+blockquote { margin:1em 0; padding-left:16px; border-left:3px solid var(--link); }
+</style></head><body><main id="content"></main>
+<!-- APP_WEB_BRIDGE -->
+<script>
+(() => {
+  const content = document.getElementById('content');
+  let current = null, restoreY = 0, restoring = false, scrollFrame = 0, renderFrame = 0;
+  const updateTheme = theme => {
+    const root = document.documentElement;
+    root.style.setProperty('--background', theme.background);
+    root.style.setProperty('--foreground', theme.foreground);
+    root.style.setProperty('--link', theme.link);
+    root.style.colorScheme = theme.dark ? 'dark' : 'light';
+  };
+  function restore() { if (current && restoring) window.scrollTo(0, restoreY); }
+  function stopRestore() { restoring = false; }
+  ['touchstart','pointerdown','wheel','keydown'].forEach(name =>
+    document.addEventListener(name, stopRestore, {passive:true}));
+  const observer = new ResizeObserver(restore);
+  const readPosition = () => restoring ? restoreY : window.scrollY;
+  const reset = () => {
+    current = null; restoring = false; restoreY = 0;
+    cancelAnimationFrame(scrollFrame);
+    cancelAnimationFrame(renderFrame);
+    observer.disconnect();
+    content.querySelectorAll('video,audio').forEach(media => media.pause());
+    content.replaceChildren();
+    window.scrollTo(0,0);
+  };
+  window.AppContentTemplate = {
+    updateTheme,
+    captureState: () => ({scrollY:readPosition()}),
+    reset,
+    render(payload, context) {
+      reset();
+      current = context;
+      document.getElementById('content-base').href = payload.baseUrl;
+      updateTheme(payload.theme);
+      restoreY = Math.max(0, payload.scrollY || 0); restoring = true;
+      content.innerHTML = payload.html;
+      content.querySelectorAll('img').forEach(img => {
+        if (!img.getAttribute('src') && img.dataset.src) img.src = img.dataset.src;
+      });
+      content.querySelectorAll('table').forEach(table => {
+        const wrapper = document.createElement('div'); wrapper.className = 'table-scroll';
+        table.before(wrapper); wrapper.append(table);
+      });
+      observer.observe(content);
+      content.addEventListener('load', restore, {capture:true, signal:context.signal});
+      content.addEventListener('error', restore, {capture:true, signal:context.signal});
+      window.addEventListener('scroll', () => {
+        cancelAnimationFrame(scrollFrame);
+        scrollFrame = requestAnimationFrame(() => context.emit('scroll', {y:readPosition()}));
+      }, {passive:true, signal:context.signal});
+      content.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : event.target.parentElement;
+    const image = target?.closest('img');
+    if (image) {
+      event.preventDefault();
+      const images = [...content.querySelectorAll('img')];
+      const urls = images.map(img => new URL(img.dataset.original || img.currentSrc || img.src, document.baseURI).href);
+      context.emit('imageClick', {urls, index:images.indexOf(image)}); return;
+    }
+    const anchor = target?.closest('a[href]');
+    if (!anchor) return;
+    event.preventDefault();
+    const url = new URL(anchor.href, document.baseURI);
+    const base = new URL(document.baseURI);
+    if (url.origin === base.origin && url.pathname === base.pathname && url.search === base.search && url.hash) {
+      stopRestore();
+      document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView();
+    } else context.emit('linkClick', {url:url.href});
+      }, {signal:context.signal});
+      context.signal.addEventListener('abort', () => { if (current === context) reset(); }, {once:true});
+      return new Promise(resolve => {
+        const finish = () => resolve();
+        context.signal.addEventListener('abort', finish, {once:true});
+        renderFrame = requestAnimationFrame(() => {
+          context.signal.removeEventListener('abort', finish);
+          if (context.isCurrent()) restore();
+          resolve();
+        });
+      });
+    }
+  };
+})();
+</script></body></html>

@@ -24,6 +24,7 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.viewmodel.ArticleUiState
+import com.graveyard.core.designsystem.webview.RichContentReadingState
 import kotlinx.coroutines.launch
 
 private const val DETAIL_PAGE = 0
@@ -36,6 +37,8 @@ internal fun ArticlePaneHost(
     presentation: NewsPresentation,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
+    readingState: RichContentReadingState,
+    onRetry: () -> Unit,
 ) {
     val pageState = rememberSaveableStateHolder()
     var singlePaneFocus by rememberSaveable { mutableStateOf(DETAIL_PAGE) }
@@ -123,6 +126,7 @@ internal fun ArticlePaneHost(
                 Box {
                     pageState.SaveableStateProvider(DETAIL_PAGE) {
                         ArticleDetailPage(uiState, ::handleBack, onMoreClicked,
+                            readingState = readingState, onRetry = onRetry,
                             closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple)
                     }
                 }
@@ -154,6 +158,8 @@ internal fun ArticlePaneHost(
                     uiState = uiState,
                     onBack = ::handleBack,
                     onMoreClicked = onMoreClicked,
+                    readingState = readingState,
+                    onRetry = onRetry,
                     onCommentsClick = {
                         if (presentation.interactive) {
                             coroutineScope.launch { pagerState.animateScrollToPage(COMMENTS_PAGE) }

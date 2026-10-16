@@ -20,6 +20,8 @@ kotlin {
         }
         minSdk = 31
 
+        androidResources { enable = true }
+
         withHostTestBuilder {
         }
 
@@ -70,6 +72,8 @@ kotlin {
 
                 api(libs.androidx.navigation3.ui)
                 api(libs.androidx.lifecycle.viewmodelNavigation3)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
 

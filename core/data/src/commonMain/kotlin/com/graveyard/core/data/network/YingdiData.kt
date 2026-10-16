@@ -16,4 +16,7 @@ internal interface YingdiData {
     ): NewsListResponse
 
     suspend fun getTagList(): List<TagDetail>
+
+    /** Returns the inner HTML of the article's rich-content element. */
+    suspend fun getArticleContentHtml(postId: Long): String
 }

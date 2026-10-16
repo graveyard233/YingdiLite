@@ -76,6 +76,8 @@ kotlin {
                 api(libs.datastore.preferences.core)
 
                 api(libs.androidx.paging.common)
+
+                implementation(libs.ksoup.core)
             }
         }
 
