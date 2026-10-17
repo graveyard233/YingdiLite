@@ -2,34 +2,45 @@
 
 package com.graveyard.core.designsystem.webview.platform
 
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.interop.UIKitView
-import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CValue
+import kotlinx.cinterop.ObjCAction
 import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.useContents
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import platform.CoreGraphics.CGPoint
+import platform.CoreGraphics.CGPointMake
 import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSError
 import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSURL
 import platform.Foundation.NSURLRequest
 import platform.Foundation.NSURLErrorCancelled
+import platform.Foundation.NSSelectorFromString
 import platform.UIKit.UIColor
-import platform.UIKit.UIGestureRecognizer
-import platform.UIKit.UIGestureRecognizerDelegateProtocol
+import platform.UIKit.UIEvent
+import platform.UIKit.UIEventTypeTouches
+import platform.UIKit.UIGestureRecognizerStateBegan
+import platform.UIKit.UIGestureRecognizerStateCancelled
+import platform.UIKit.UIGestureRecognizerStateChanged
+import platform.UIKit.UIGestureRecognizerStateFailed
 import platform.UIKit.UIPanGestureRecognizer
 import platform.UIKit.UIScrollView
 import platform.UIKit.UIScrollViewDelegateProtocol
+import platform.UIKit.UITouch
+import platform.UIKit.UITouchPhase
 import platform.UIKit.UIView
 import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationAction
@@ -56,13 +67,17 @@ internal actual fun rememberWebViewFactory(): (WebViewConfiguration) -> WebViewP
 @Composable
 internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interaction: WebViewInteraction, modifier: Modifier) {
     val view = (port as IosWebViewPort).view
-    key(bindingId, interaction) {
+    val density = LocalDensity.current.density
+    key(bindingId, interaction, density) {
         val dispatcher = remember { NestedScrollDispatcher() }
+        val connection = remember { object : NestedScrollConnection {} }
         val scope = rememberCoroutineScope()
+        val decay = rememberSplineBasedDecay<Float>()
+        val coordinator = remember(dispatcher, scope, decay) { WebViewScrollCoordinator(dispatcher, scope, decay) }
         UIKitView(
-            factory = { IosWebViewContainer(view, dispatcher, scope, interaction) },
+            factory = { IosWebViewContainer(view, coordinator, density, interaction) },
             modifier = if (interaction == WebViewInteraction.NestedScroll) modifier.nestedScroll(
-                connection = object : NestedScrollConnection {},
+                connection = connection,
                 dispatcher = dispatcher,
             ) else modifier,
             onRelease = { container ->
@@ -75,22 +90,25 @@ internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interactio
 
 private class IosWebViewContainer(
     private val content: WKWebView,
-    dispatcher: NestedScrollDispatcher,
-    scope: CoroutineScope,
+    private val coordinator: WebViewScrollCoordinator,
+    density: Float,
     interaction: WebViewInteraction,
 ) : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
-    private val scrollCoordinator = IosScrollCoordinator(content.scrollView, dispatcher, scope)
+    private val scrollCoordinator: IosScrollCoordinator?
 
     init {
         content.removeFromSuperview()
-        content.scrollView.alwaysBounceVertical = true
-        if (interaction == WebViewInteraction.NestedScroll) {
-            content.scrollView.alwaysBounceHorizontal = false
-            content.scrollView.directionalLockEnabled = true
-            content.scrollView.delegate = scrollCoordinator
-            content.scrollView.panGestureRecognizer.delegate = scrollCoordinator
-        }
+        scrollCoordinator = if (interaction == WebViewInteraction.NestedScroll) {
+            IosScrollCoordinator(content.scrollView, coordinator, density)
+        } else null
         addSubview(content)
+    }
+
+    override fun hitTest(point: CValue<CGPoint>, withEvent: UIEvent?): UIView? {
+        val hit = super.hitTest(point, withEvent)
+        // UIKit performs hit testing on touch-down, before the pan passes its recognition slop.
+        if (hit != null && withEvent?.type == UIEventTypeTouches) scrollCoordinator?.touchDown(withEvent)
+        return hit
     }
 
     override fun layoutSubviews() {
@@ -99,84 +117,259 @@ private class IosWebViewContainer(
     }
 
     fun dispose() {
-        content.scrollView.delegate = null
-        content.scrollView.panGestureRecognizer.delegate = null
+        coordinator.cancel()
+        scrollCoordinator?.dispose()
+    }
+
+    override fun didMoveToWindow() {
+        super.didMoveToWindow()
+        if (window == null) {
+            coordinator.cancel()
+            scrollCoordinator?.cancelGesture()
+        }
+    }
+
+    override fun willRemoveSubview(subview: UIView) {
+        if (subview === content) dispose()
+        super.willRemoveSubview(subview)
     }
 }
 
 private class IosScrollCoordinator(
     private val scrollView: UIScrollView,
-    private val dispatcher: NestedScrollDispatcher,
-    private val scope: CoroutineScope,
-) : NSObject(), UIScrollViewDelegateProtocol, UIGestureRecognizerDelegateProtocol {
-    private var lastY = scrollView.contentOffset.useContents { y }
+    private val coordinator: WebViewScrollCoordinator,
+    private val density: Float,
+) : NSObject(), UIScrollViewDelegateProtocol {
+    private enum class DragAxis { Pending, Horizontal, Vertical }
+
+    private val previousDelegate = scrollView.delegate
+    private val previousBounceVertical = scrollView.alwaysBounceVertical
+    private val previousBounceHorizontal = scrollView.alwaysBounceHorizontal
+    private val previousDirectionalLock = scrollView.directionalLockEnabled
+    private val panSelector = NSSelectorFromString("panChanged:")
+    private var axis = DragAxis.Pending
+    private var contentY = scrollView.contentOffset.useContents { y }
     private var lastTranslationY = 0.0
     private var tracking = false
-    private var dragging = false
+    private var nativeGesture = false
+    private var correcting = false
+    private var handlingScrollCallback = false
+    private var blockingNativeDeceleration = false
+    private var endVelocity = 0f
+    private var disposed = false
 
-    override fun gestureRecognizerShouldBegin(gestureRecognizer: UIGestureRecognizer): Boolean {
-        val pan = gestureRecognizer as? UIPanGestureRecognizer ?: return true
-        // Give the surrounding horizontal pager horizontal drags.
-        return pan.velocityInView(pan.view).useContents {
-            if (x == 0.0 && y == 0.0) return true
-            abs(y) >= abs(x)
+    init {
+        scrollView.alwaysBounceVertical = true
+        scrollView.alwaysBounceHorizontal = false
+        scrollView.directionalLockEnabled = true
+        scrollView.delegate = this
+        // UIScrollView must retain ownership of its built-in pan recognizer's delegate.
+        scrollView.panGestureRecognizer.addTarget(this, panSelector)
+    }
+
+    fun touchDown(event: UIEvent) {
+        if (disposed) return
+        val touches = event.allTouches
+        if (!touches.isNullOrEmpty() && touches.none { (it as? UITouch)?.phase == UITouchPhase.UITouchPhaseBegan }) return
+        coordinator.cancel()
+        if (tracking || scrollView.panGestureRecognizer.numberOfTouches > 0uL || (event.allTouches?.size ?: 0) > 1) {
+            nativeGesture = true
+            tracking = false
+        } else {
+            nativeGesture = false
+            axis = DragAxis.Pending
+            lastTranslationY = 0.0
+        }
+        blockingNativeDeceleration = false
+        endVelocity = 0f
+        contentY = boundedY(scrollView.contentOffset.useContents { y })
+    }
+
+    @ObjCAction
+    fun panChanged(pan: UIPanGestureRecognizer) {
+        if (disposed) return
+        if (pan.numberOfTouches > 1uL) handOverToNative()
+        when (pan.state) {
+            UIGestureRecognizerStateBegan, UIGestureRecognizerStateChanged -> consumePan()
+            UIGestureRecognizerStateCancelled, UIGestureRecognizerStateFailed -> cancelGesture()
         }
     }
 
     override fun scrollViewWillBeginDragging(scrollView: UIScrollView) {
+        delegateFor("scrollViewWillBeginDragging:")?.scrollViewWillBeginDragging(scrollView)
+        coordinator.cancel()
         tracking = true
-        dragging = true
-        lastY = scrollView.contentOffset.useContents { y }
-        lastTranslationY = scrollView.panGestureRecognizer.translationInView(scrollView).useContents { y }
+        contentY = boundedY(scrollView.contentOffset.useContents { y })
+        consumePan()
     }
 
     override fun scrollViewDidScroll(scrollView: UIScrollView) {
-        if (!tracking) {
-            lastY = scrollView.contentOffset.useContents { y }
-            return
+        if (disposed || correcting) return
+        handlingScrollCallback = true
+        try {
+            if (blockingNativeDeceleration && scrollView.decelerating) {
+                setContentY(contentY, stopDeceleration = true)
+            } else if (tracking && !nativeGesture) {
+                consumePan()
+            } else {
+                // Loads, reading-position restoration and layout changes never drive Compose parents.
+                contentY = boundedY(scrollView.contentOffset.useContents { y })
+            }
+        } finally {
+            handlingScrollCallback = false
         }
+        delegateFor("scrollViewDidScroll:")?.scrollViewDidScroll(scrollView)
+    }
 
-        val y = scrollView.contentOffset.useContents { this.y }
-        val deltaY = lastY - y
-        val translationY = scrollView.panGestureRecognizer.translationInView(scrollView).useContents { this.y }
-        val fingerDelta = if (dragging) translationY - lastTranslationY else 0.0
-        val top = scrollView.adjustedContentInset.useContents { -top }
-        // Split the pan delta at the scroll boundary so the app bar receives the remainder
-        // without waiting for a second drag after the document reaches its top.
-        val consumed = deltaY.toFloat()
-        val available = if (fingerDelta > 0.0 && y <= top + 0.5) {
-            (fingerDelta - deltaY).coerceAtLeast(0.0).toFloat()
-        } else {
-            0f
+    private fun consumePan() {
+        val pan = scrollView.panGestureRecognizer
+        if (pan.numberOfTouches > 1uL) handOverToNative()
+        if (!tracking || nativeGesture) return
+        if (axis == DragAxis.Pending) {
+            pan.velocityInView(null).useContents {
+                if (x == 0.0 && y == 0.0) return
+                axis = if (abs(y) >= abs(x)) DragAxis.Vertical else DragAxis.Horizontal
+            }
         }
-        dispatcher.dispatchPostScroll(
-            consumed = Offset(0f, consumed),
-            available = Offset(0f, available),
-            source = if (dragging) NestedScrollSource.UserInput else NestedScrollSource.SideEffect,
-        )
-        lastY = y
-        lastTranslationY = translationY
+        if (axis != DragAxis.Vertical) return
+        val translation = pan.translationInView(null).useContents { y }
+        val delta = ((translation - lastTranslationY) * density).toFloat()
+        lastTranslationY = translation
+        coordinator.scroll(delta, NestedScrollSource.UserInput, ::scrollContent)
+        // Native scrolling may run before or after the pan target; always keep its result equal
+        // to the allocated document position. Recursive didScroll callbacks are suppressed.
+        setContentY(contentY)
+    }
+
+    private fun scrollContent(delta: Float): Float {
+        val before = boundedY(contentY)
+        val requested = before - delta.toDouble() / density.toDouble()
+        val target = boundedY(requested)
+        contentY = target
+        setContentY(target)
+        val actual = boundedY(scrollView.contentOffset.useContents { y })
+        // Retain subpixel distance when UIKit rounds the requested point offset to pixels.
+        contentY = if (abs(actual - target) * density <= 0.5) target else actual
+        if (contentY == requested) return delta
+        return ((before - contentY) * density).toFloat().coerceIn(minOf(0f, delta), maxOf(0f, delta))
+    }
+
+    private fun boundedY(y: Double): Double {
+        val top = scrollView.adjustedContentInset.useContents { -top }
+        val bottom = maxOf(top, scrollView.contentSize.useContents { height } -
+            scrollView.bounds.useContents { size.height } + scrollView.adjustedContentInset.useContents { bottom })
+        return y.coerceIn(top, bottom)
+    }
+
+    private fun setContentY(y: Double, stopDeceleration: Boolean = false) {
+        if (!stopDeceleration && scrollView.contentOffset.useContents { this.y } == y) return
+        correcting = true
+        try {
+            scrollView.setContentOffset(CGPointMake(scrollView.contentOffset.useContents { x }, y), animated = false)
+        } finally {
+            correcting = false
+        }
+        if (!handlingScrollCallback) delegateFor("scrollViewDidScroll:")?.scrollViewDidScroll(scrollView)
+    }
+
+    private fun handOverToNative() {
+        coordinator.cancel()
+        nativeGesture = true
+        tracking = false
+        lastTranslationY = 0.0
+        endVelocity = 0f
+    }
+
+    override fun scrollViewWillEndDragging(
+        scrollView: UIScrollView,
+        withVelocity: CValue<CGPoint>,
+        targetContentOffset: CPointer<CGPoint>?,
+    ) {
+        delegateFor("scrollViewWillEndDragging:withVelocity:targetContentOffset:")
+            ?.scrollViewWillEndDragging(scrollView, withVelocity, targetContentOffset)
+        if (!tracking || nativeGesture || axis != DragAxis.Vertical) return
+        consumePan()
+        endVelocity = scrollView.panGestureRecognizer.velocityInView(null).useContents { (y * density).toFloat() }
+        targetContentOffset?.pointed?.y = contentY
+        blockingNativeDeceleration = true
     }
 
     override fun scrollViewDidEndDragging(scrollView: UIScrollView, willDecelerate: Boolean) {
-        dragging = false
-        if (!willDecelerate) finishScroll()
+        delegateFor("scrollViewDidEndDragging:willDecelerate:")?.scrollViewDidEndDragging(scrollView, willDecelerate)
+        val controlled = tracking && !nativeGesture && axis == DragAxis.Vertical
+        tracking = false
+        if (controlled) {
+            setContentY(contentY, stopDeceleration = true)
+            coordinator.startFling(endVelocity, ::scrollContent)
+        }
     }
 
     override fun scrollViewDidEndDecelerating(scrollView: UIScrollView) {
-        finishScroll()
+        blockingNativeDeceleration = false
+        delegateFor("scrollViewDidEndDecelerating:")?.scrollViewDidEndDecelerating(scrollView)
     }
 
     override fun scrollViewDidEndScrollingAnimation(scrollView: UIScrollView) {
-        finishScroll()
+        delegateFor("scrollViewDidEndScrollingAnimation:")?.scrollViewDidEndScrollingAnimation(scrollView)
     }
 
-    private fun finishScroll() {
-        if (!tracking) return
+    override fun viewForZoomingInScrollView(scrollView: UIScrollView): UIView? =
+        delegateFor("viewForZoomingInScrollView:")?.viewForZoomingInScrollView(scrollView)
+
+    override fun scrollViewDidZoom(scrollView: UIScrollView) {
+        delegateFor("scrollViewDidZoom:")?.scrollViewDidZoom(scrollView)
+    }
+
+    override fun scrollViewWillBeginZooming(scrollView: UIScrollView, withView: UIView?) {
+        handOverToNative()
+        delegateFor("scrollViewWillBeginZooming:withView:")?.scrollViewWillBeginZooming(scrollView, withView)
+    }
+
+    override fun scrollViewDidEndZooming(scrollView: UIScrollView, withView: UIView?, atScale: Double) {
+        delegateFor("scrollViewDidEndZooming:withView:atScale:")?.scrollViewDidEndZooming(scrollView, withView, atScale)
+    }
+
+    override fun scrollViewWillBeginDecelerating(scrollView: UIScrollView) {
+        delegateFor("scrollViewWillBeginDecelerating:")?.scrollViewWillBeginDecelerating(scrollView)
+    }
+
+    override fun scrollViewShouldScrollToTop(scrollView: UIScrollView): Boolean {
+        cancelGesture()
+        return delegateFor("scrollViewShouldScrollToTop:")?.scrollViewShouldScrollToTop(scrollView) ?: true
+    }
+
+    override fun scrollViewDidScrollToTop(scrollView: UIScrollView) {
+        delegateFor("scrollViewDidScrollToTop:")?.scrollViewDidScrollToTop(scrollView)
+    }
+
+    override fun scrollViewDidChangeAdjustedContentInset(scrollView: UIScrollView) {
+        contentY = boundedY(scrollView.contentOffset.useContents { y })
+        delegateFor("scrollViewDidChangeAdjustedContentInset:")?.scrollViewDidChangeAdjustedContentInset(scrollView)
+    }
+
+    private fun delegateFor(selector: String): UIScrollViewDelegateProtocol? =
+        previousDelegate?.takeIf { it.respondsToSelector(NSSelectorFromString(selector)) }
+
+    fun cancelGesture() {
+        coordinator.cancel()
         tracking = false
-        dragging = false
-        scope.launch {
-            dispatcher.dispatchPostFling(Velocity.Zero, Velocity.Zero)
+        nativeGesture = false
+        blockingNativeDeceleration = false
+        axis = DragAxis.Pending
+        lastTranslationY = 0.0
+        endVelocity = 0f
+    }
+
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        cancelGesture()
+        scrollView.panGestureRecognizer.removeTarget(this, panSelector)
+        if (scrollView.delegate === this) {
+            scrollView.delegate = previousDelegate
+            scrollView.alwaysBounceVertical = previousBounceVertical
+            scrollView.alwaysBounceHorizontal = previousBounceHorizontal
+            scrollView.directionalLockEnabled = previousDirectionalLock
         }
     }
 }

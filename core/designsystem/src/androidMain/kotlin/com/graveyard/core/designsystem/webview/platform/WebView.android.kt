@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
@@ -20,23 +21,21 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 internal actual fun rememberWebViewFactory(): (WebViewConfiguration) -> WebViewPort {
@@ -47,33 +46,39 @@ internal actual fun rememberWebViewFactory(): (WebViewConfiguration) -> WebViewP
 @Composable
 internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interaction: WebViewInteraction, modifier: Modifier) {
     val view = (port as AndroidWebViewPort).view
-    key(bindingId, interaction) {
+    val density = LocalDensity.current.density
+    key(bindingId, interaction, density) {
         val dispatcher = remember { NestedScrollDispatcher() }
         val connection = remember { object : NestedScrollConnection {} }
         val scope = rememberCoroutineScope()
+        val decay = rememberSplineBasedDecay<Float>()
+        val coordinator = remember(dispatcher, scope, decay) { WebViewScrollCoordinator(dispatcher, scope, decay) }
         AndroidView(
             factory = { context ->
-                if (interaction == WebViewInteraction.NestedScroll) WebViewScrollContainer(context, view, dispatcher, scope)
+                if (interaction == WebViewInteraction.NestedScroll) WebViewScrollContainer(context, view, coordinator)
                 else FrameLayout(context).apply {
                     (view.parent as? ViewGroup)?.removeView(view)
                     addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 }
             },
             modifier = if (interaction == WebViewInteraction.NestedScroll) modifier.nestedScroll(connection, dispatcher) else modifier,
-            onRelease = { container -> container.removeAllViews() },
+            onRelease = { container ->
+                coordinator.cancel()
+                container.removeAllViews()
+            },
         )
     }
 }
 
 private class WebViewScrollContainer(
     context: Context,
-    private val webView: WebView,
-    private val dispatcher: NestedScrollDispatcher,
-    private val scope: CoroutineScope,
+    private val webView: ScrollableWebView,
+    private val coordinator: WebViewScrollCoordinator,
 ) : FrameLayout(context) {
     private enum class DragAxis { Pending, Horizontal, Vertical }
 
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val configuration = ViewConfiguration.get(context)
+    private val touchSlop = configuration.scaledTouchSlop
     private var dragAxis = DragAxis.Pending
     private var downX = 0f
     private var downY = 0f
@@ -81,27 +86,20 @@ private class WebViewScrollContainer(
     private var downOriginY = 0f
     private var pointerId = 0
     private var touching = false
-    private var reportingScroll = false
-    private var dispatchingTouch = false
-    private var settling: Job? = null
-    private val finishScroll = Runnable {
-        reportingScroll = false
-        settling = scope.launch {
-            dispatcher.dispatchPostFling(Velocity.Zero, Velocity.Zero)
-        }
-    }
+    private var nativeGesture = false
+    private var parentConsumedY = 0f
+    private var contentY: Double? = null
+    private var correcting = false
+    private var velocityTracker: VelocityTracker? = null
 
     init {
         (webView.parent as? ViewGroup)?.removeView(webView)
         addView(webView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        webView.setOnScrollChangeListener { _, _, y, _, oldY ->
-            if (reportingScroll && !dispatchingTouch && y != oldY) {
-                dispatcher.dispatchPostScroll(
-                    consumed = Offset(0f, (oldY - y).toFloat()),
-                    available = Offset.Zero,
-                    source = if (touching) NestedScrollSource.UserInput else NestedScrollSource.SideEffect,
-                )
-                if (!touching) scheduleScrollEnd()
+        webView.setOnScrollChangeListener { _, _, _, _, _ ->
+            if (!correcting && ((touching && !nativeGesture && dragAxis == DragAxis.Vertical) || coordinator.isFlinging)) {
+                // Chromium can apply a touch sample asynchronously. Only the touch adapter and
+                // shared decay allocate document distance; native callbacks cannot consume it again.
+                correctContentOffset()
             }
         }
     }
@@ -109,10 +107,13 @@ private class WebViewScrollContainer(
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                removeCallbacks(finishScroll)
-                settling?.cancel()
+                coordinator.cancel()
                 touching = true
-                reportingScroll = false
+                nativeGesture = false
+                parentConsumedY = 0f
+                contentY = null
+                velocityTracker?.recycle()
+                velocityTracker = VelocityTracker.obtain()
                 dragAxis = DragAxis.Pending
                 downX = event.rawX
                 downY = event.rawY
@@ -121,86 +122,135 @@ private class WebViewScrollContainer(
                 pointerId = event.getPointerId(0)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (dragAxis == DragAxis.Pending) {
+                if (!nativeGesture && dragAxis == DragAxis.Pending) {
                     val dx = abs(event.rawX - downX)
                     val dy = abs(event.rawY - downY)
                     if (maxOf(dx, dy) > touchSlop) {
                         dragAxis = if (dy >= dx) DragAxis.Vertical else DragAxis.Horizontal
                     }
                 }
-                if (dragAxis == DragAxis.Vertical) reportingScroll = true
             }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                dragAxis = DragAxis.Vertical
-                reportingScroll = true
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> {
+                coordinator.cancel()
+                nativeGesture = true
+                contentY = null
+                lastY = event.rawY
+                velocityTracker?.clear()
             }
         }
 
         // Claim only vertical drags so the pager can still detect horizontal touch slop.
-        super.requestDisallowInterceptTouchEvent(dragAxis == DragAxis.Vertical)
+        val vertical = !nativeGesture && dragAxis == DragAxis.Vertical
+        super.requestDisallowInterceptTouchEvent(nativeGesture || vertical)
+        val raw = MotionEvent.obtain(event)
+        raw.offsetLocation(event.rawX - event.x, event.rawY - event.y)
+        velocityTracker?.addMovement(raw)
+        raw.recycle()
         val fingerDelta = if (
-            event.actionMasked == MotionEvent.ACTION_MOVE && dragAxis == DragAxis.Vertical &&
+            event.actionMasked == MotionEvent.ACTION_MOVE && vertical &&
             event.pointerCount == 1 && event.getPointerId(0) == pointerId
         ) event.rawY - lastY else 0f
         lastY = event.rawY
         pointerId = event.getPointerId(0)
 
+        if (vertical && contentY == null) {
+            contentY = webView.scrollY.toDouble()
+            webView.cancelLongPress()
+        }
+        val preConsumed = if (fingerDelta != 0f) coordinator.preScroll(fingerDelta, NestedScrollSource.UserInput) else 0f
+        parentConsumedY += preConsumed
+
         // Collapsing the app bar moves the viewport; keep WebView's touch coordinates continuous.
         val adjusted = MotionEvent.obtain(event)
-        if (dragAxis == DragAxis.Vertical) {
-            adjusted.offsetLocation(0f, event.rawY - event.y - downOriginY)
+        adjusted.offsetLocation(0f, event.rawY - event.y - downOriginY - parentConsumedY)
+        if (event.actionMasked == MotionEvent.ACTION_UP && vertical) {
+            // Preserve native taps and selection, but never let native and Compose flings race.
+            adjusted.action = MotionEvent.ACTION_CANCEL
         }
-        val beforeScrollY = webView.scrollY
         val handled = try {
-            dispatchingTouch = true
             super.dispatchTouchEvent(adjusted)
         } finally {
-            dispatchingTouch = false
             adjusted.recycle()
         }
         if (fingerDelta != 0f) {
-            // Split this gesture sample into WebView-consumed and boundary remainder so the app bar
-            // can start expanding in the same drag that brings the document to its top.
-            val consumed = (beforeScrollY - webView.scrollY).toFloat()
-            val available = if (fingerDelta > 0f && !webView.canScrollVertically(-1)) {
-                (fingerDelta - consumed).coerceAtLeast(0f)
-            } else {
-                0f
-            }
-            dispatcher.dispatchPostScroll(
-                consumed = Offset(0f, consumed),
-                available = Offset(0f, available),
-                source = NestedScrollSource.UserInput,
-            )
+            val remaining = fingerDelta - preConsumed
+            val consumed = scrollContent(remaining)
+            parentConsumedY += coordinator.postScroll(consumed, remaining - consumed, NestedScrollSource.UserInput)
         }
         if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
             touching = false
             super.requestDisallowInterceptTouchEvent(false)
-            if (reportingScroll) scheduleScrollEnd()
+            if (event.actionMasked == MotionEvent.ACTION_UP && vertical) {
+                velocityTracker?.computeCurrentVelocity(1000, configuration.scaledMaximumFlingVelocity.toFloat())
+                val velocity = velocityTracker?.getYVelocity(pointerId) ?: 0f
+                coordinator.startFling(
+                    if (abs(velocity) >= configuration.scaledMinimumFlingVelocity) velocity else 0f,
+                    ::scrollContent,
+                )
+            } else if (event.actionMasked == MotionEvent.ACTION_CANCEL) coordinator.cancel()
+            velocityTracker?.recycle()
+            velocityTracker = null
         }
         return handled
     }
 
     override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) {
         // WebView's own requests must not override the direction chosen for this gesture.
-        super.requestDisallowInterceptTouchEvent(touching && dragAxis == DragAxis.Vertical)
+        super.requestDisallowInterceptTouchEvent(touching && (nativeGesture || dragAxis == DragAxis.Vertical))
     }
 
-    private fun scheduleScrollEnd() {
-        removeCallbacks(finishScroll)
-        // Native WebView owns the fling; snap the app bar once its scroll callbacks go quiet.
-        postDelayed(finishScroll, 120L)
+    private fun scrollContent(delta: Float): Float {
+        val maximum = webView.maximumScrollY.toDouble()
+        val before = (contentY ?: webView.scrollY.toDouble()).coerceIn(0.0, maximum)
+        val requested = before - delta.toDouble()
+        val target = requested.coerceIn(0.0, maximum)
+        contentY = target
+        correctContentOffset()
+        // Keep fractions in contentY so pixel rounding neither loses distance nor invents a
+        // boundary on slow decay frames. Account for any additional clamping by WebView itself.
+        val actual = if (webView.scrollY == target.roundToInt()) target else webView.scrollY.toDouble()
+        contentY = actual
+        // Subtracting absolute offsets can manufacture a remainder even without a boundary.
+        if (actual == requested) return delta
+        return (before - actual).toFloat().coerceIn(minOf(0f, delta), maxOf(0f, delta))
+    }
+
+    private fun correctContentOffset() {
+        val target = contentY?.roundToInt()?.coerceIn(0, webView.maximumScrollY) ?: return
+        if (webView.scrollY == target) return
+        correcting = true
+        try {
+            webView.scrollTo(webView.scrollX, target)
+        } finally {
+            correcting = false
+        }
+    }
+
+    private fun dispose() {
+        coordinator.cancel()
+        velocityTracker?.recycle()
+        velocityTracker = null
+        touching = false
+        contentY = null
+    }
+
+    override fun onDetachedFromWindow() {
+        dispose()
+        super.onDetachedFromWindow()
     }
 
     override fun onViewRemoved(child: View) {
         if (child === webView) {
             webView.setOnScrollChangeListener(null)
-            removeCallbacks(finishScroll)
-            settling?.cancel()
-            reportingScroll = false
+            dispose()
         }
         super.onViewRemoved(child)
     }
+}
+
+private class ScrollableWebView(context: Context) : WebView(context) {
+    val maximumScrollY: Int
+        get() = (computeVerticalScrollRange() - computeVerticalScrollExtent()).coerceAtLeast(0)
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -213,7 +263,7 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
     private var epoch = 0L
     private var navigation = 0L
     private val popups = mutableSetOf<WebView>()
-    val view = WebView(context).apply {
+    val view = ScrollableWebView(context).apply {
         setBackgroundColor(Color.TRANSPARENT)
         settings.javaScriptEnabled = configuration.javaScript
         settings.domStorageEnabled = configuration.domStorage

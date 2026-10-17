@@ -25,6 +25,7 @@ import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.viewmodel.ArticleUiState
 import com.graveyard.core.designsystem.webview.RichContentReadingState
+import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.coroutines.launch
 
 private const val DETAIL_PAGE = 0
@@ -34,6 +35,7 @@ private const val PAGE_COUNT = 2
 @Composable
 internal fun ArticlePaneHost(
     uiState: ArticleUiState,
+    newsAuthor: NewsAuthor,
     presentation: NewsPresentation,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
@@ -125,7 +127,7 @@ internal fun ArticlePaneHost(
             content = {
                 Box {
                     pageState.SaveableStateProvider(DETAIL_PAGE) {
-                        ArticleDetailPage(uiState, ::handleBack, onMoreClicked,
+                        ArticleDetailPage(uiState, newsAuthor, ::handleBack, onMoreClicked,
                             readingState = readingState, onRetry = onRetry,
                             closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple)
                     }
@@ -156,6 +158,7 @@ internal fun ArticlePaneHost(
             when (page) {
                 DETAIL_PAGE -> ArticleDetailPage(
                     uiState = uiState,
+                    newsAuthor = newsAuthor,
                     onBack = ::handleBack,
                     onMoreClicked = onMoreClicked,
                     readingState = readingState,

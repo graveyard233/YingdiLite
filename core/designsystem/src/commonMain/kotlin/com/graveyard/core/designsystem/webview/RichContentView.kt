@@ -28,6 +28,7 @@ import com.graveyard.core.designsystem.webview.pool.WebViewPool
 import com.graveyard.core.designsystem.webview.template.RichContentDocument
 import com.graveyard.core.designsystem.webview.template.RichContentTemplate
 import com.graveyard.core.designsystem.webview.template.TemplateRuntime
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.core.designsystem.generated.resources.Res
@@ -49,6 +50,7 @@ fun RichContentView(
     interaction: WebViewInteraction = WebViewInteraction.Native,
     onNavigation: (WebNavigationRequest) -> WebNavigationDecision = { WebNavigationDecision.Block },
     onEvent: (RichContentEvent) -> Unit = {},
+    templateData: JsonObject = JsonObject(emptyMap()),
 ) {
     val pool = LocalWebViewPool.current
     val callback by rememberUpdatedState(onEvent)
@@ -57,7 +59,7 @@ fun RichContentView(
     val key = template.reuseKey
     var attempt by remember(key, contentKey) { mutableStateOf(0) }
     var failed by remember(key, contentKey) { mutableStateOf(false) }
-    var loaded by remember(key, contentKey, html, baseUrl, attempt) { mutableStateOf(false) }
+    var loaded by remember(key, contentKey, html, baseUrl, templateData, attempt) { mutableStateOf(false) }
     var lease by remember(pool, key, contentKey, readingState, attempt) { mutableStateOf<WebViewPool.Lease?>(null) }
     val handler by rememberUpdatedState<(RichContentEvent) -> Unit> { event ->
         when (event) {
@@ -78,7 +80,12 @@ fun RichContentView(
         (acquired?.entry as? TemplateRuntime)?.bind(acquired.id, readingState) { handler(it) }
         onDispose { acquired?.let(pool::release) }
     }
-    SideEffect { (lease?.entry as? TemplateRuntime)?.update(RichContentDocument(contentKey, html, baseUrl), theme) }
+    SideEffect {
+        (lease?.entry as? TemplateRuntime)?.update(
+            RichContentDocument(contentKey, html, baseUrl, templateData),
+            theme,
+        )
+    }
     Box(modifier) {
         if (!failed) lease?.let { NativeWebView(it.entry.port, it.id, interaction, Modifier.fillMaxSize()) }
         if (failed) Button(

@@ -22,7 +22,9 @@ window.AppContentTemplate = {
 };
 ```
 
-`render` receives `{html, baseUrl, scrollY, theme}`. `context.signal` aborts the old render on replacement
+`render` receives `{html, baseUrl, scrollY, theme, templateData}`. `templateData` is an optional
+template-owned JSON object for feature-specific data; the shared WebView layer does not interpret it.
+`context.signal` aborts the old render on replacement
 or reset. Use it on event listeners and cancel timers, animation frames, observers and outstanding tasks
 on abort/reset. An async render must settle on cancellation. Reset must finish all cleanup before resolving.
 Do not access the native bridge directly: keep the per-render `context` in event closures and use
@@ -47,9 +49,16 @@ source rather than restoring history. No template hooks, CSS, theme or native me
 HTTP(S) navigation is allowed by default; custom schemes are blocked. Navigation decisions also cover
 new windows, which open in the same view when allowed. Cookies and browser caches are not cleared globally.
 
-`WebViewInteraction.Native` is the default. Select `NestedScroll` for a collapsing Compose app bar
-and horizontal pager, as the news screen does. Device scrolling and native iOS compilation require
-separate platform validation; host tests exercise the shared state machines and fake ports.
+`WebViewInteraction.Native` is the default and retains platform gestures and inertia.
+`NestedScroll` coordinates the main document with any Compose nested-scroll parent: parent pre-scroll,
+document scrolling of the remaining distance, then parent post-scroll with the document's consumption
+and remainder. Parent consumption determines the order; no app-bar or screen state is consulted.
+Single-finger vertical flings use Compose spline decay and the same allocation on every frame,
+including pre/post-fling handoff and parent settling. New input, cancellation, multiple pointers and
+release cancel the shared fling. Horizontal gestures, taps, long presses and multitouch remain native.
+Independent HTML scroll regions and iframes do not gain nested-scroll support. Programmatic scrolling
+and reading-position restoration do not drive parents. Platform adapters convert native coordinates
+and velocities to Compose pixels and restore temporary settings on release.
 
 ## News detail loading flow
 
@@ -67,10 +76,12 @@ local template. It does not navigate the WebView directly to the remote article 
 5. `RichContentView` acquires and binds a lease from the application-level `WebViewPool`. A new runtime
    loads `news_detail.html` with the shared `template_bridge.js` injected and waits for the JS `ready`
    event. A reused runtime keeps its already initialized shell and skips this step.
-6. `TemplateRuntime.update()` supplies the latest document and theme. Once ready, it sends `render` with
-   the body HTML, article base URL, saved CSS-pixel scroll offset, and theme.
-7. The news template replaces the body, sets its base URL and theme, promotes image `data-src` when
-   needed, wraps tables for horizontal scrolling, and restores the reading position on the next frame.
+6. `TemplateRuntime.update()` supplies the latest document, template data, and theme. Once ready, it
+   sends `render` with the body HTML, article base URL, saved CSS-pixel scroll offset, theme, and
+   `templateData.author`.
+7. The news template replaces the body, sets its base URL and theme, renders the optional
+   `templateData.author` profile bar, promotes image `data-src` when needed, wraps tables for
+   horizontal scrolling, and restores the reading position on the next frame.
    The bridge then emits `rendered`, allowing `RichContentView` to hide its own spinner.
 
 `rendered` means the template's render hook has completed, not that all images have loaded. Image
@@ -159,7 +170,7 @@ are never borrowed, and acquisition does not wait for cleanup. An incompatible i
 | `mode` | `template` | Local templates and ordinary pages are different modes. |
 | `configuration` | `templateBridge = true`, `javaScript = true`, `domStorage = false` | All native configuration fields must match. |
 | `templateId` | `news.detail` | Both articles must use the same template identity. |
-| `revision` | `1` | Bump when the template or its resource dependencies change. |
+| `revision` | `2` | Bump when the template or its resource dependencies change. |
 | `protocolVersion` | `1` | Host and template protocol versions must match. |
 | Template `baseUrl` | `https://mob.iyingdi.com/` | The template loading base URL must match. |
 

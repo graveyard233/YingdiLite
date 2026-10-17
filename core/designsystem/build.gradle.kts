@@ -65,6 +65,7 @@ kotlin {
                 // Add KMP dependencies here
                 api(libs.compose.runtime)
                 api(libs.compose.foundation)
+                implementation(libs.compose.animation)
                 api(libs.compose.material3)
                 api(libs.compose.ui)
                 api(libs.compose.components.resources)

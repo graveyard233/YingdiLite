@@ -3,7 +3,12 @@ package com.graveyard.core.designsystem.webview.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-enum class WebViewInteraction { Native, NestedScroll }
+enum class WebViewInteraction {
+    /** Keep platform scrolling, gestures and inertia. */
+    Native,
+    /** Coordinate the main document with Compose parents, including shared vertical inertia. */
+    NestedScroll,
+}
 
 enum class WebNavigationDecision { Allow, Block, OpenExternal }
 

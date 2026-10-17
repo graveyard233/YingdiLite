@@ -24,9 +24,12 @@ import com.graveyard.core.designsystem.webview.platform.WebNavigationDecision
 import com.graveyard.core.designsystem.webview.platform.WebViewInteraction
 import com.graveyard.feature.news.ui.articleDetail.NewsDetailTemplate
 import com.graveyard.core.data.result.DataException
+import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
 import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
 import com.graveyard.feature.news.viewmodel.ArticleUiState
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.article_more
@@ -39,6 +42,7 @@ import yingdilite.feature.news.generated.resources.news_load_failed
 @Composable
 internal fun ArticleDetailPage(
     uiState: ArticleUiState,
+    newsAuthor: NewsAuthor,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
     readingState: RichContentReadingState,
@@ -103,6 +107,16 @@ internal fun ArticleDetailPage(
                     html = uiState.content.html,
                     baseUrl = uiState.content.baseUrl,
                     readingState = readingState,
+                    templateData = buildJsonObject {
+                        put("author", buildJsonObject {
+                            put("id", newsAuthor.id)
+                            put("username", newsAuthor.username)
+                            put("head", newsAuthor.head)
+                            put("credits", newsAuthor.credits)
+                            put("level", newsAuthor.level)
+                            put("badgeJson", newsAuthor.badgeJson)
+                        })
+                    },
                     modifier = Modifier.fillMaxSize(),
                     interaction = WebViewInteraction.NestedScroll,
                     onNavigation = { request ->

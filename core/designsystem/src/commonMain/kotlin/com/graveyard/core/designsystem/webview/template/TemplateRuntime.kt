@@ -30,7 +30,12 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
 
-internal data class RichContentDocument(val key: String, val html: String, val baseUrl: String)
+internal data class RichContentDocument(
+    val key: String,
+    val html: String,
+    val baseUrl: String,
+    val templateData: JsonObject = JsonObject(emptyMap()),
+)
 
 internal class TemplateRuntime(
     override val port: WebViewPort,
@@ -111,6 +116,7 @@ internal class TemplateRuntime(
             put("baseUrl", content.baseUrl)
             put("scrollY", reading?.offset ?: 0.0)
             put("theme", themeJson(colors))
+            put("templateData", content.templateData)
         })
         renderTimeout?.cancel()
         renderTimeout = scope.launch { delay(15_000); fail() }

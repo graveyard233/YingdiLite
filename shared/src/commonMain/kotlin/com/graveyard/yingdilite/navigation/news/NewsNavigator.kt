@@ -2,13 +2,14 @@ package com.graveyard.yingdilite.navigation.news
 
 import androidx.navigation3.runtime.NavKey
 import com.graveyard.core.designsystem.navigation.Navigator
+import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 
 /** Extension in the assembly layer avoids a core:designsystem -> feature:news dependency. */
-internal fun Navigator.selectArticle(articleId: String, articleTitle: String) {
+internal fun Navigator.selectArticle(articleId: String, articleTitle: String, newsAuthor: NewsAuthor) {
     if (state.currentTopLevelKey != NewsRoute) return
-    replaceSelectedArticle(state.currentSubStack, ArticleRoute(articleId, articleTitle))
+    replaceSelectedArticle(state.currentSubStack, ArticleRoute(articleId, articleTitle, newsAuthor))
 }
 
 internal fun replaceSelectedArticle(stack: MutableList<NavKey>, article: ArticleRoute) {

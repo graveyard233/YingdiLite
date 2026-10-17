@@ -2,15 +2,113 @@
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <base id="content-base" href="about:blank">
 <style>
-:root { color-scheme: light dark; --background: #fff; --foreground: #202124; --link: #176b55; }
-@media(prefers-color-scheme:dark) { :root { --background:#171717; --foreground:#e8e8e8; --link:#8fd9bc; } }
+:root {
+  color-scheme: light dark;
+  --background: #fff;
+  --foreground: #202124;
+  --link: #176b55;
+  --surface-container-low: #f1f4f9;
+  --on-surface-variant: #414750;
+  --outline-variant: #c1c7d2;
+  --avatar-background: #dfe8f5;
+  --avatar-foreground: #176b55;
+}
+@media(prefers-color-scheme:dark) {
+  :root {
+    --background:#171717;
+    --foreground:#e8e8e8;
+    --link:#8fd9bc;
+    --surface-container-low:#242424;
+    --on-surface-variant:#c7c7c7;
+    --outline-variant:#4a4a4a;
+    --avatar-background:#34443f;
+    --avatar-foreground:#b6ead6;
+  }
+}
 * { box-sizing:border-box; }
 html { background:var(--background); color:var(--foreground); overflow-wrap:anywhere; }
 body { margin:0; padding:16px; font:17px/1.75 system-ui,sans-serif; letter-spacing:0; }
+#author-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 10px 16px; /* 适当增加横向内边距，更舒展 */
+
+  /* 1. 移除硬边框 */
+  border: none;
+
+  /* 2. M3 规范卡片圆角：推荐 16px (Shape.corner.large) */
+  border-radius: 16px;
+
+  /* 3. 使用 M3 填充色 */
+  background: var(--surface-container-low);
+
+  /* 4. M3 Filled Card 默认不加重阴影（Elevation 0），若需保留层次可用极淡的环境光 */
+  box-shadow: none;
+}
+#author-bar[hidden] { display:none; }
+#author-avatar,
+#author-fallback {
+  width:44px;
+  height:44px;
+  flex:0 0 44px;
+  border-radius:50%;
+}
+#author-avatar[hidden],
+#author-fallback[hidden] { display:none; }
+#author-avatar { object-fit:cover; background:var(--avatar-background); }
+#author-fallback {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--avatar-background);
+  color:var(--avatar-foreground);
+  font-size:18px;
+  font-weight:700;
+  line-height:1;
+}
+#author-info {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  flex:1;
+}
+#author-name {
+  flex:0 1 auto;
+  min-width:0;
+  overflow:hidden;
+  color:var(--foreground);
+  font-size:16px;
+  font-weight:600;
+  line-height:22px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#author-level {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 64px;
+  width:64px;
+  height:24px;
+  padding:0 8px;
+  border-radius:6px;
+  background:var(--avatar-background);
+  color:var(--avatar-foreground);
+  font-size:12px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+  white-space:nowrap;
+}
+#author-level[hidden] { display:none; }
 #content { min-width:0; }
 p { margin:0 0 1em; }
 a { color:var(--link); }
-img { max-width:100% !important; height:auto !important; }
+#content img { max-width:100% !important; height:auto !important; }
 video,iframe { max-width:100% !important; }
 figure { margin:1em 0; }
 pre,.table-scroll { max-width:100%; overflow-x:auto; }
@@ -18,21 +116,95 @@ pre { white-space:pre; font-size:14px; }
 table { border-collapse:collapse; }
 td,th { border:1px solid currentColor; padding:6px 10px; }
 blockquote { margin:1em 0; padding-left:16px; border-left:3px solid var(--link); }
-</style></head><body><main id="content"></main>
+</style></head><body>
+<section id="author-bar" hidden aria-label="作者信息">
+  <img id="author-avatar" alt="" hidden>
+  <span id="author-fallback" aria-hidden="true"></span>
+  <div id="author-info">
+    <div id="author-name"></div>
+    <span id="author-level" hidden></span>
+  </div>
+</section>
+<main id="content"></main>
 <!-- APP_WEB_BRIDGE -->
 <script>
 (() => {
   const content = document.getElementById('content');
+  const authorBar = document.getElementById('author-bar');
+  const authorAvatar = document.getElementById('author-avatar');
+  const authorFallback = document.getElementById('author-fallback');
+  const authorName = document.getElementById('author-name');
+  const authorLevel = document.getElementById('author-level');
   let current = null, restoreY = 0, restoring = false, scrollFrame = 0, renderFrame = 0;
+  let authorGeneration = 0;
   const updateTheme = theme => {
     const root = document.documentElement;
     root.style.setProperty('--background', theme.background);
     root.style.setProperty('--foreground', theme.foreground);
     root.style.setProperty('--link', theme.link);
+    root.style.setProperty('--surface-container-low', `color-mix(in srgb, ${theme.background} 92%, ${theme.foreground})`);
+    root.style.setProperty('--on-surface-variant', `color-mix(in srgb, ${theme.foreground} 72%, ${theme.background})`);
+    root.style.setProperty('--outline-variant', `color-mix(in srgb, ${theme.foreground} 24%, transparent)`);
+    root.style.setProperty('--avatar-background', `color-mix(in srgb, ${theme.link} 18%, ${theme.background})`);
+    root.style.setProperty('--avatar-foreground', theme.link);
     root.style.colorScheme = theme.dark ? 'dark' : 'light';
   };
   function restore() { if (current && restoring) window.scrollTo(0, restoreY); }
   function stopRestore() { restoring = false; }
+  const isSafeImageUrl = value => {
+    if (typeof value !== 'string' || !value.trim()) return false;
+    try {
+      const url = new URL(value, document.baseURI);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (_) { return false; }
+  };
+  const clearAuthor = () => {
+    authorGeneration++;
+    authorBar.hidden = true;
+    authorBar.removeAttribute('data-author-id');
+    authorAvatar.onload = null;
+    authorAvatar.onerror = null;
+    authorAvatar.removeAttribute('src');
+    authorAvatar.alt = '';
+    authorAvatar.hidden = true;
+    authorFallback.textContent = '';
+    authorFallback.hidden = false;
+    authorName.textContent = '';
+    authorLevel.textContent = '';
+    authorLevel.removeAttribute('aria-label');
+    authorLevel.hidden = true;
+  };
+  const renderAuthor = author => {
+    clearAuthor();
+    if (!author || (!author.id && !author.username && !author.head)) return;
+    const generation = authorGeneration;
+    const username = typeof author.username === 'string' ? author.username.trim() : '';
+    const displayName = username || '未知作者';
+    authorBar.hidden = false;
+    authorBar.dataset.authorId = String(author.id ?? 0);
+    authorName.textContent = displayName;
+    authorFallback.textContent = Array.from(username || '匿')[0] || '匿';
+    if (Number.isInteger(author.level) && author.level >= 1 && author.level <= 100) {
+      authorLevel.textContent = `Lv. ${author.level}`;
+      authorLevel.setAttribute('aria-label', `等级 ${author.level}`);
+      authorLevel.hidden = false;
+    }
+    const head = typeof author.head === 'string' ? author.head.trim() : '';
+    if (!isSafeImageUrl(head)) return;
+    authorAvatar.alt = displayName;
+    authorAvatar.onload = () => {
+      if (generation !== authorGeneration) return;
+      authorAvatar.hidden = false;
+      authorFallback.hidden = true;
+    };
+    authorAvatar.onerror = () => {
+      if (generation !== authorGeneration) return;
+      authorAvatar.removeAttribute('src');
+      authorAvatar.hidden = true;
+      authorFallback.hidden = false;
+    };
+    authorAvatar.src = head;
+  };
   ['touchstart','pointerdown','wheel','keydown'].forEach(name =>
     document.addEventListener(name, stopRestore, {passive:true}));
   const observer = new ResizeObserver(restore);
@@ -44,6 +216,7 @@ blockquote { margin:1em 0; padding-left:16px; border-left:3px solid var(--link);
     observer.disconnect();
     content.querySelectorAll('video,audio').forEach(media => media.pause());
     content.replaceChildren();
+    clearAuthor();
     window.scrollTo(0,0);
   };
   window.AppContentTemplate = {
@@ -55,6 +228,7 @@ blockquote { margin:1em 0; padding-left:16px; border-left:3px solid var(--link);
       current = context;
       document.getElementById('content-base').href = payload.baseUrl;
       updateTheme(payload.theme);
+      renderAuthor(payload.templateData?.author);
       restoreY = Math.max(0, payload.scrollY || 0); restoring = true;
       content.innerHTML = payload.html;
       content.querySelectorAll('img').forEach(img => {

@@ -32,6 +32,7 @@ import androidx.paging.compose.itemKey
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.model.news.NewsArticle
+import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.core.model.news.TagInfo
 import com.graveyard.feature.news.ui.newsList.component.BannerPlaceholder
 import com.graveyard.feature.news.ui.newsList.component.NewsArticleItem
@@ -141,7 +142,7 @@ internal fun NewsPage(
     isRefreshing: Boolean,
     onRetryBanners: () -> Unit,
     onRefresh: () -> Unit,
-    onArticleClick: (String, String) -> Unit,
+    onArticleClick: (String, String, NewsAuthor) -> Unit,
     selectedArticleId: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -222,7 +223,7 @@ internal fun NewsPage(
                             article = article,
                             selected = article.sourceId == selectedArticleId,
                             nowEpochSeconds = nowEpochSeconds,
-                            onClick = { onArticleClick(article.sourceId,article.title) },
+                            onClick = { onArticleClick(article.sourceId, article.title, article.author) },
                             modifier = Modifier.animateItem(),
                         )
                     }

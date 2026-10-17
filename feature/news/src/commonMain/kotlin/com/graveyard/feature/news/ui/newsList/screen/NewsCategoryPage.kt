@@ -11,6 +11,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
+import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import org.jetbrains.compose.resources.getString
@@ -32,7 +33,7 @@ internal fun NewsCategoryPage(
     isCurrentPage: (Int) -> Boolean,
     onPageVisited: (Int) -> Unit,
     onShowRefreshFailure: (Int, String) -> Unit,
-    onArticleClick: (String, String) -> Unit,
+    onArticleClick: (String, String, NewsAuthor) -> Unit,
     selectedArticleId: String? = null,
 ) {
     val banners = remember(viewModel, tagId) {
