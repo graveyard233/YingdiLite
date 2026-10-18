@@ -43,13 +43,11 @@
     <string name="news_no_more">No more results</string>
     <string name="news_empty">No news yet</string>
     <string name="news_load_failed">Failed to load news</string>
+    <string name="news_content_load_failed">Couldn't load content</string>
     <string name="news_banners_load_failed">Failed to load recommendations</string>
-
-    <!-- Pull-to-refresh partial failure -->
-    <string name="news_refresh_section_news">News</string>
-    <string name="news_refresh_section_recommendations">Recommendations</string>
-    <string name="news_refresh_section_separator">, </string>
-    <string name="news_refresh_failure">Could not refresh %1$s. Showing previous content.</string>
+    <string name="news_refresh_failed_keep_content">Couldn't refresh. Showing previous content.</string>
+    <string name="news_banners_stale">Couldn't update recommendations. Showing previous content.</string>
+    <string name="news_dismiss">Dismiss</string>
 
     <!-- Errors -->
     <string name="news_error_network">Network unavailable. Please check your connection.</string>
@@ -65,4 +63,9 @@
     <string name="article_more">More</string>
     <string name="news_child_title">News subpage</string>
     <string name="article_close_selection">Close article</string>
+    <string name="article_deck_copied">Deck code copied</string>
+    <string name="article_deck_copy_failed">Couldn\'t copy deck code</string>
+    <string name="article_write_comment">Elaborate.</string>
+    <string name="article_fire_count">%1$s hype reactions</string>
+    <string name="article_favorite">Favorite</string>
 </resources>

@@ -22,6 +22,7 @@ enum class AppIcon(val imageVector: ImageVector) {
     Tune(tuneIcon),
     Notifications(notificationsIcon),
     Comment(commentIcon),
+    Edit(editIcon),
     Image(imageIcon),
     Refresh(refreshIcon),
     Menu(menu),
@@ -31,4 +32,8 @@ enum class AppIcon(val imageVector: ImageVector) {
     Sync(sync),
     ArrowBack(arrowBack),
     MoreVert(moreVert),
+    Download(download),
+    Favorite(favorite),
+    Fire(fire),
+    FireFill(fireFill),
 }

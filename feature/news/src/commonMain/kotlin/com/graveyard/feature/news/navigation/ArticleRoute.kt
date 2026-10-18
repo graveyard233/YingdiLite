@@ -9,4 +9,6 @@ data class ArticleRoute(
     val articleId: String,
     val articleTitle: String,
     val newsAuthor: NewsAuthor = NewsAuthor(),
+    val replyNum: String = "",
+    val likeNum: String = "",
 ) : NavKey

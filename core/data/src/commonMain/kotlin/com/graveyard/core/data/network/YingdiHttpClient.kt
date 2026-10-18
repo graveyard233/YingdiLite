@@ -2,9 +2,12 @@ package com.graveyard.core.data.network
 
 import com.graveyard.core.data.crypto.YingdiSignPlugin
 import io.ktor.client.HttpClientConfig
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+
+private const val REQUEST_TIMEOUT_MILLIS = 5_000L
 
 /**
  * Android / iOS 共用的 HttpClient 配置：各端 actual 只负责选引擎。
@@ -17,6 +20,9 @@ internal fun HttpClientConfig<*>.configureYingdiClient(
 ) {
     install(ContentNegotiation) {
         json(json)
+    }
+    install(HttpTimeout) {
+        requestTimeoutMillis = REQUEST_TIMEOUT_MILLIS
     }
     install(YingdiSignPlugin)
     install(HttpDiagnosticsPlugin) {

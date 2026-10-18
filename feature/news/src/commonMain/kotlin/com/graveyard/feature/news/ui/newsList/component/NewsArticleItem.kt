@@ -22,12 +22,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.graveyard.core.designsystem.theme.AppTheme
 import com.graveyard.core.model.news.NewsArticle
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
@@ -53,6 +55,8 @@ internal fun NewsArticleItem(
     BoxWithConstraints {
         val compact = maxWidth < 400.dp || LocalDensity.current.fontScale > 1.3f
         val largeText = LocalDensity.current.fontScale > 1.3f
+        val imageHeight = if (compact) 72.dp else 88.dp
+        val imageWidth = imageHeight * (124f / 88f)
         Column(
             modifier = modifier
                 .fillMaxWidth()
@@ -70,8 +74,9 @@ internal fun NewsArticleItem(
             ) {
                 Column(
                     modifier = Modifier
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .weight(1f)
+                        .heightIn(min = imageHeight),
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = article.title,
@@ -80,6 +85,7 @@ internal fun NewsArticleItem(
                         maxLines = if (largeText) 3 else 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.heightIn(min = 8.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -112,11 +118,42 @@ internal fun NewsArticleItem(
                 NewsImage(
                     url = article.cover,
                     modifier = Modifier
-                        .size(width = if (compact) 72.dp else 124.dp, height = if (compact) 72.dp else 88.dp)
+                        .size(width = imageWidth, height = imageHeight)
                         .clip(MaterialTheme.shapes.small),
                 )
             }
             HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.45f))
+        }
+    }
+}
+
+
+@Preview(name = "Compact", widthDp = 360, showBackground = true, locale = "zh")
+@Preview(name = "Wide", widthDp = 600, showBackground = true, locale = "zh")
+@Preview(name = "Large font", widthDp = 360, fontScale = 1.5f, showBackground = true, locale = "zh")
+@Preview(name = "Wide large font", widthDp = 600, fontScale = 1.5f, showBackground = true, locale = "zh")
+@Composable
+private fun NewsArticleItemPreview() {
+    val article = NewsArticle(
+        title = "新版本资讯速递",
+        tags = listOf("炉石传说"),
+        replyNum = "128",
+        showTime = 1_700_000_000L,
+    )
+    AppTheme {
+        Column {
+            NewsArticleItem(
+                article = article,
+                nowEpochSeconds = 1_700_003_600L,
+                onClick = {},
+            )
+            NewsArticleItem(
+                article = article.copy(
+                    title = "新版本卡牌与玩法前瞻：一起了解本次更新的重点内容和最新活动安排",
+                ),
+                nowEpochSeconds = 1_700_003_600L,
+                onClick = {},
+            )
         }
     }
 }

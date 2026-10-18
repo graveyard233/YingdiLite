@@ -1,3 +1,8 @@
 <resources>
     <string name="rich_content_retry">Retry</string>
+
+    <!-- Image gallery -->
+    <string name="image_gallery_close">Close image</string>
+    <string name="image_gallery_download">Download image</string>
+    <string name="image_gallery_load_failed">Couldn't load image</string>
 </resources>

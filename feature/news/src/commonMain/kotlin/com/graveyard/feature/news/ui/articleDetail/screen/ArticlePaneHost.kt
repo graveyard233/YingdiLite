@@ -41,6 +41,12 @@ internal fun ArticlePaneHost(
     onMoreClicked: () -> Unit,
     readingState: RichContentReadingState,
     onRetry: () -> Unit,
+    onImageClick: (urls: List<String>, index: Int) -> Unit,
+    replyNum: String = "",
+    likeNum: String = "",
+    onWriteCommentClick: () -> Unit = {},
+    onFireClick: () -> Unit = {},
+    onFavoriteClick: () -> Unit = {},
 ) {
     val pageState = rememberSaveableStateHolder()
     var singlePaneFocus by rememberSaveable { mutableStateOf(DETAIL_PAGE) }
@@ -127,9 +133,22 @@ internal fun ArticlePaneHost(
             content = {
                 Box {
                     pageState.SaveableStateProvider(DETAIL_PAGE) {
-                        ArticleDetailPage(uiState, newsAuthor, ::handleBack, onMoreClicked,
-                            readingState = readingState, onRetry = onRetry,
-                            closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple)
+                        ArticleDetailPage(
+                            uiState = uiState,
+                            newsAuthor = newsAuthor,
+                            onBack = ::handleBack,
+                            onMoreClicked = onMoreClicked,
+                            readingState = readingState,
+                            onRetry = onRetry,
+                            onImageClick = onImageClick,
+                            replyNum = replyNum,
+                            likeNum = likeNum,
+                            onWriteCommentClick = onWriteCommentClick,
+                            onFireClick = onFireClick,
+                            onFavoriteClick = onFavoriteClick,
+                            contentVisible = presentation.interactive,
+                            closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple,
+                        )
                     }
                 }
                 Box {
@@ -162,7 +181,14 @@ internal fun ArticlePaneHost(
                     onBack = ::handleBack,
                     onMoreClicked = onMoreClicked,
                     readingState = readingState,
+                    contentVisible = presentation.interactive && pagerState.settledPage == DETAIL_PAGE,
                     onRetry = onRetry,
+                    onImageClick = onImageClick,
+                    replyNum = replyNum,
+                    likeNum = likeNum,
+                    onWriteCommentClick = onWriteCommentClick,
+                    onFireClick = onFireClick,
+                    onFavoriteClick = onFavoriteClick,
                     onCommentsClick = {
                         if (presentation.interactive) {
                             coroutineScope.launch { pagerState.animateScrollToPage(COMMENTS_PAGE) }

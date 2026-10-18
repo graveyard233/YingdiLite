@@ -52,7 +52,6 @@ kotlin {
             implementation(libs.androidx.navigationevent.compose)
             implementation(libs.compose.ui)
             implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
 
@@ -100,8 +99,6 @@ kotlin {
             implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.compose.uiTooling)
             implementation(libs.ktor.client.okhttp)
         }
         iosMain.dependencies {

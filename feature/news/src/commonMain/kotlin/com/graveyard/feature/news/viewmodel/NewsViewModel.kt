@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.graveyard.core.data.local.preferences.UserSettings
-import com.graveyard.core.data.paging.NewsRefreshEvent
 import com.graveyard.core.data.repository.NewsRepository
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.model.news.NewsArticle
@@ -20,9 +19,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,59 +44,12 @@ class NewsViewModel(
 
     private val newsSessions = mutableMapOf<Int, NewsSession>()
     private val bannerJobs = mutableMapOf<Int, Job>()
-    private val refreshJobs = mutableMapOf<Int, Job>()
-    private val mutableRefreshingTags = MutableStateFlow<Set<Int>>(emptySet())
-    internal val refreshingTags = mutableRefreshingTags.asStateFlow()
-    private val mutableRefreshResults = MutableSharedFlow<NewsRefreshResult>()
-    internal val refreshResults = mutableRefreshResults.asSharedFlow()
-
-    /** The UI triggers Paging synchronously; the VM retains no presenter, list state or callback. */
-    @MainThread
-    internal fun refresh(tagId: Int, hadNews: Boolean, hadBanners: Boolean, requestRefresh: () -> Unit) {
-        if (tagId in refreshJobs) return
-        val refreshState = pagingRefreshStateFor(tagId)
-        val previousRequest = refreshState.value.request
-        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                val bannerJob = reloadBanners(tagId)
-                val result = refreshState.first { it.request !== previousRequest && !it.isLoading }
-                bannerJob.join()
-                if (result.isCancelled || bannerJob.isCancelled) return@launch
-                mutableRefreshResults.emit(NewsRefreshResult(
-                    tagId = tagId,
-                    newsSucceeded = result.error == null,
-                    newsFailed = hadNews && result.error != null,
-                    bannersFailed = hadBanners && mutableUiState.value.bannersByTag[tagId]?.error != null,
-                ))
-            } finally {
-                if (refreshJobs[tagId] === currentCoroutineContext()[Job]) {
-                    refreshJobs.remove(tagId)
-                    mutableRefreshingTags.update { it - tagId }
-                }
-            }
-        }
-        refreshJobs[tagId] = job
-        mutableRefreshingTags.update { it + tagId }
-        try {
-            requestRefresh()
-            job.start()
-        } catch (error: Throwable) {
-            refreshJobs.remove(tagId)
-            mutableRefreshingTags.update { it - tagId }
-            job.cancel()
-            throw error
-        }
-    }
 
     @MainThread
     fun updateCategories(tagIds: List<Int>) {
         require(tagIds.isNotEmpty()) { "News requires at least one category." }
         require(tagIds.distinct().size == tagIds.size) { "News category IDs must be unique." }
         val retainedIds = tagIds.toSet()
-        (refreshJobs.keys - retainedIds).forEach { tagId ->
-            refreshJobs.remove(tagId)?.cancel()
-            mutableRefreshingTags.update { it - tagId }
-        }
         (newsSessions.keys - retainedIds).forEach { tagId ->
             newsSessions.remove(tagId)?.scope?.cancel()
         }
@@ -128,38 +77,12 @@ class NewsViewModel(
     fun newsFor(tagId: Int): Flow<PagingData<NewsArticle>> =
         sessionFor(tagId).news
 
-    @MainThread
-    internal fun pagingRefreshStateFor(tagId: Int): StateFlow<NewsPagingRefreshState> =
-        sessionFor(tagId).refreshState.asStateFlow()
-
     private fun sessionFor(tagId: Int): NewsSession = newsSessions.getOrPut(tagId) {
         val scope = CoroutineScope(
             viewModelScope.coroutineContext + SupervisorJob(viewModelScope.coroutineContext[Job]),
         )
-        val refreshState = MutableStateFlow(NewsPagingRefreshState())
-        val news = repository.getNews(
-            tagId = tagId,
-            onRefreshEvent = { event ->
-                refreshState.update { previous ->
-                    when {
-                        event is NewsRefreshEvent.Started -> NewsPagingRefreshState(
-                            request = event.request,
-                            isLoading = true,
-                        )
-                        previous.request !== event.request -> previous
-                        event is NewsRefreshEvent.Completed -> NewsPagingRefreshState(
-                            request = event.request,
-                            error = event.error,
-                        )
-                        else -> NewsPagingRefreshState(
-                            request = event.request,
-                            isCancelled = true,
-                        )
-                    }
-                }
-            },
-        ).cachedIn(scope)
-        NewsSession(scope, refreshState, news)
+        val news = repository.getNews(tagId = tagId).cachedIn(scope)
+        NewsSession(scope, news)
     }
 
     @MainThread
@@ -218,8 +141,6 @@ class NewsViewModel(
     }
 
     override fun onCleared() {
-        refreshJobs.values.toList().forEach { it.cancel() }
-        refreshJobs.clear()
         bannerJobs.values.toList().forEach { it.cancel() }
         bannerJobs.clear()
         newsSessions.values.forEach { it.scope.cancel() }
@@ -232,15 +153,7 @@ class NewsViewModel(
     }
 }
 
-internal data class NewsRefreshResult(
-    val tagId: Int,
-    val newsSucceeded: Boolean,
-    val newsFailed: Boolean,
-    val bannersFailed: Boolean,
-)
-
 private class NewsSession(
     val scope: CoroutineScope,
-    val refreshState: MutableStateFlow<NewsPagingRefreshState>,
     val news: Flow<PagingData<NewsArticle>>,
 )

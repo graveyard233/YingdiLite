@@ -40,9 +40,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import com.graveyard.feature.news.navigation.LocalNewsPresentation
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.graveyard.core.designsystem.icons.AppIcon
+import com.graveyard.core.designsystem.media.ImageGalleryPage
+import com.graveyard.core.designsystem.media.imageGalleryDialogProperties
 import com.graveyard.core.designsystem.navigation.Navigator
 import com.graveyard.core.designsystem.navigation.rememberNavigationState
 import com.graveyard.core.designsystem.navigation.toEntries
@@ -71,6 +74,7 @@ import com.graveyard.yingdilite.navigation.news.NewsSceneStrategy
 import com.graveyard.yingdilite.navigation.news.PaneBounds
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
+import com.graveyard.yingdilite.navigation.news.openImages
 import com.graveyard.yingdilite.navigation.news.scenePresentation
 import com.graveyard.yingdilite.navigation.news.selectArticle
 import kotlinx.serialization.modules.SerializersModule
@@ -86,10 +90,11 @@ private val topLevelDestinations = listOf(
 private val topLevelKeys = topLevelDestinations.map(TopLevelDestination::key)
 
 // 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型决定是否装饰场景。
-private val hiddenNavigationRouteTypes = setOf(
+private val hiddenNavigationRouteTypes = listOf(
     CardsChildRoute::class,
     MineChildRoute::class,
     ArticleRoute::class,
+    ImageGalleryRoute::class,
 )
 
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
@@ -104,6 +109,7 @@ fun AppNavigation(
                 polymorphic(NavKey::class) {
                     subclass(NewsRoute::class, NewsRoute.serializer())
                     subclass(ArticleRoute::class, ArticleRoute.serializer())
+                    subclass(ImageGalleryRoute::class, ImageGalleryRoute.serializer())
                     subclass(NewsChildRoute::class, NewsChildRoute.serializer())
                     subclass(CommunityRoute::class, CommunityRoute.serializer())
                     subclass(CommunityChildRoute::class, CommunityChildRoute.serializer())
@@ -125,8 +131,12 @@ fun AppNavigation(
     val layoutType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
     val navigator = remember(navigationState) { Navigator(navigationState) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val galleryStrategy = remember { DialogSceneStrategy<NavKey>() }
+    val gallery = navigationState.currentKey as? ImageGalleryRoute
 
     fun handleBack() {
+        // A single dispatch can request several pops before the Dialog owns back handling.
+        if (gallery != null && navigationState.currentKey != gallery) return
         if (navigationState.canGoBack) {
             navigator.goBack()
         }
@@ -142,15 +152,24 @@ fun AppNavigation(
     val currentTargetPresentation by rememberUpdatedState(targetPresentation)
     var navigationSize by remember(layoutType) { mutableStateOf(IntSize.Zero) }
     val entries = navigationState.toEntries { key ->
-        NavEntry(key, metadata = mapOf(
-            APP_NAVIGATION_SCENE_KEY to key.hasAppNavigation(),
-            APP_ROUTE_KEY to key,
-            APP_TOP_LEVEL_KEY to navigationState.subStacks.entries.first { key in it.value }.key,
-        )) {
+        val galleryMetadata = if (key is ImageGalleryRoute) {
+            DialogSceneStrategy.dialog(imageGalleryDialogProperties())
+        } else emptyMap()
+        NavEntry(
+            key = key,
+            contentKey = if (key is ImageGalleryRoute) "image-gallery:${key.instanceId}" else key.toString(),
+            metadata = galleryMetadata + mapOf(
+                APP_NAVIGATION_SCENE_KEY to key.hasAppNavigation(),
+                APP_ROUTE_KEY to key,
+                APP_TOP_LEVEL_KEY to navigationState.subStacks.entries.first { key in it.value }.key,
+            ),
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (key == NewsRoute || key is ArticleRoute) Modifier else Modifier.safeDrawingPadding()),
+                    .then(if (key == NewsRoute || key is ArticleRoute || key is ImageGalleryRoute) {
+                        Modifier
+                    } else Modifier.safeDrawingPadding()),
             ) {
                 val interactive = LocalSceneInteractive.current && key in currentTargetPresentation.interactiveEntryKeys
                 CompositionLocalProvider(LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive)) {
@@ -208,11 +227,16 @@ fun AppNavigation(
                 calculateNewsSingleLayout(maxWidth.value, maxHeight.value, vertical, horizontal)
             }
             val newsStrategy = NewsSceneStrategy(feedLayout, readingLayout)
-            val targetNewsScene = newsStrategy.createScene(entries)
-            val resolvedPresentation = targetNewsScene?.let(::scenePresentation) ?: AppScenePresentation(
+            val underlyingEntries = if (gallery != null) entries.dropLast(1) else entries
+            val targetNewsScene = newsStrategy.createScene(underlyingEntries)
+            val basePresentation = targetNewsScene?.let(::scenePresentation) ?: AppScenePresentation(
                 null,
                 navigationState.currentKey.hasAppNavigation(),
                 setOf(navigationState.currentKey)
+            )
+            val resolvedPresentation = if (gallery == null) basePresentation else basePresentation.copy(
+                visibleEntryKeys = basePresentation.visibleEntryKeys + gallery,
+                interactiveEntryKeys = setOf(gallery),
             )
             androidx.compose.runtime.SideEffect { targetPresentation = resolvedPresentation }
             LaunchedEffect(resolvedPresentation.interactiveEntryKeys) {
@@ -228,7 +252,9 @@ fun AppNavigation(
                             darkTheme = darkTheme,
                             currentKey = navigationState.currentTopLevelKey,
                             destinations = topLevelDestinations,
-                            onNavigate = navigator::navigate,
+                            onNavigate = { destination ->
+                                if (navigationState.currentKey !is ImageGalleryRoute) navigator.navigate(destination)
+                            },
                             layoutType = layoutType,
                         )
                     },
@@ -240,7 +266,7 @@ fun AppNavigation(
                     onBack = ::handleBack,
                     modifier = Modifier.fillMaxSize(),
                     sceneDecoratorStrategies = listOf(navigationSceneDecorator),
-                    sceneStrategies = listOf(newsStrategy),
+                    sceneStrategies = listOf(galleryStrategy, newsStrategy),
                     sharedTransitionScope = this,
                     transitionSpec = {
                         slideInHorizontally(
@@ -288,15 +314,29 @@ private fun AppNavEntry(
     when (key) {
         NewsRoute -> NewsRouteScreen(
             onShowMessage = onShowMessage,
-            onArticleClick = { articleId, articleTitle, newsAuthor ->
-                navigator.selectArticle(articleId, articleTitle, newsAuthor)
+            onArticleClick = { articleId, articleTitle, newsAuthor, replyNum, likeNum ->
+                navigator.selectArticle(articleId, articleTitle, newsAuthor, replyNum, likeNum)
             },
         )
-        is ArticleRoute -> ArticleRouteScreen(
-            articleId = key.articleId,
-            articleTitle = key.articleTitle,
-            newsAuthor = key.newsAuthor,
-            onBack = navigator::goBack,
+        is ArticleRoute -> {
+            ArticleRouteScreen(
+                articleId = key.articleId,
+                articleTitle = key.articleTitle,
+                newsAuthor = key.newsAuthor,
+                replyNum = key.replyNum,
+                likeNum = key.likeNum,
+                onBack = { if (navigator.state.currentKey == key) navigator.goBack() },
+                onImageClick = { urls, index ->
+                    if (navigator.state.currentKey == key) navigator.openImages(urls, index)
+                },
+            )
+        }
+        is ImageGalleryRoute -> ImageGalleryPage(
+            urls = key.urls,
+            initialIndex = key.initialIndex,
+            onClose = {
+                if (navigator.state.currentKey == key) navigator.goBack()
+            },
         )
         NewsChildRoute -> NewsChildScreen(navigator::goBack)
         CommunityRoute -> CommunityScreen { navigator.navigate(CommunityChildRoute) }

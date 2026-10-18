@@ -14,12 +14,6 @@ import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import com.graveyard.feature.news.viewmodel.NewsViewModel
-import org.jetbrains.compose.resources.getString
-import yingdilite.feature.news.generated.resources.Res
-import yingdilite.feature.news.generated.resources.news_refresh_failure
-import yingdilite.feature.news.generated.resources.news_refresh_section_news
-import yingdilite.feature.news.generated.resources.news_refresh_section_recommendations
-import yingdilite.feature.news.generated.resources.news_refresh_section_separator
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -28,12 +22,10 @@ internal fun NewsCategoryPage(
     tagId: Int,
     viewModel: NewsViewModel,
     pagingItemsByTag: SnapshotStateMap<Int, LazyPagingItems<NewsArticle>>,
-    isRefreshing: Boolean,
     stateHolder: SaveableStateHolder,
     isCurrentPage: (Int) -> Boolean,
     onPageVisited: (Int) -> Unit,
-    onShowRefreshFailure: (Int, String) -> Unit,
-    onArticleClick: (String, String, NewsAuthor) -> Unit,
+    onArticleClick: (String, String, NewsAuthor, String, String) -> Unit,
     selectedArticleId: String? = null,
 ) {
     val banners = remember(viewModel, tagId) {
@@ -53,44 +45,22 @@ internal fun NewsCategoryPage(
     stateHolder.SaveableStateProvider(tagId) {
         val listState = rememberLazyListState()
         val newsItems = pagingItemsByTag[tagId]
-        val currentPage by androidx.compose.runtime.rememberUpdatedState(isCurrentPage)
-        val showFailure by androidx.compose.runtime.rememberUpdatedState(onShowRefreshFailure)
-        LaunchedEffect(viewModel, tagId, listState) {
-            viewModel.refreshResults.collect { result ->
-                if (result.tagId != tagId || !currentPage(tagId)) return@collect
-                if (result.newsSucceeded) listState.scrollToItem(0)
-                val failures = buildList {
-                    if (result.newsFailed) add(getString(Res.string.news_refresh_section_news))
-                    if (result.bannersFailed) add(getString(Res.string.news_refresh_section_recommendations))
-                }
-                if (failures.isNotEmpty() && currentPage(tagId)) {
-                    showFailure(tagId, getString(Res.string.news_refresh_failure,
-                        failures.joinToString(getString(Res.string.news_refresh_section_separator))))
-                }
-            }
-        }
         NewsPage(
             bannerState = bannerState,
             newsItems = newsItems,
             listState = listState,
-            isRefreshing = isRefreshing,
             onRetryBanners = {
-                if (!isRefreshing &&
-                    viewModel.uiState.value.bannersByTag[tagId]?.isLoading != true
-                ) {
+                if (viewModel.uiState.value.bannersByTag[tagId]?.isLoading != true) {
                     viewModel.reloadBanners(tagId)
                 }
             },
             onRefresh = {
                 if (isCurrentPage(tagId) &&
                     newsItems != null &&
-                    !isRefreshing &&
-                    newsItems.loadState.refresh !is LoadState.Loading &&
-                    !bannerState.isLoading
+                    newsItems.loadState.refresh !is LoadState.Loading
                 ) {
-                    viewModel.refresh(tagId, newsItems.itemCount > 0, bannerState.items.isNotEmpty()) {
-                        newsItems.refresh()
-                    }
+                    viewModel.reloadBanners(tagId)
+                    newsItems.refresh()
                 }
             },
             onArticleClick = onArticleClick,

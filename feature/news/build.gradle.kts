@@ -80,6 +80,7 @@ kotlin {
                 implementation(libs.androidx.navigation3.ui)
                 implementation(libs.androidx.lifecycle.viewmodelNavigation3)
                 implementation(libs.androidx.lifecycle.runtimeCompose)
+                implementation(libs.androidx.lifecycle.viewmodelSavedstate)
                 implementation(libs.androidx.navigationevent.compose)
 
                 implementation(project.dependencies.platform(libs.koin.bom))
@@ -97,4 +98,8 @@ kotlin {
         }
     }
 
+}
+
+dependencies {
+    androidRuntimeClasspath(libs.compose.uiTooling)
 }

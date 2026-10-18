@@ -1,280 +1,947 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<base id="content-base" href="about:blank">
-<style>
-:root {
-  color-scheme: light dark;
-  --background: #fff;
-  --foreground: #202124;
-  --link: #176b55;
-  --surface-container-low: #f1f4f9;
-  --on-surface-variant: #414750;
-  --outline-variant: #c1c7d2;
-  --avatar-background: #dfe8f5;
-  --avatar-foreground: #176b55;
-}
-@media(prefers-color-scheme:dark) {
-  :root {
-    --background:#171717;
-    --foreground:#e8e8e8;
-    --link:#8fd9bc;
-    --surface-container-low:#242424;
-    --on-surface-variant:#c7c7c7;
-    --outline-variant:#4a4a4a;
-    --avatar-background:#34443f;
-    --avatar-foreground:#b6ead6;
-  }
-}
-* { box-sizing:border-box; }
-html { background:var(--background); color:var(--foreground); overflow-wrap:anywhere; }
-body { margin:0; padding:16px; font:17px/1.75 system-ui,sans-serif; letter-spacing:0; }
-#author-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  margin: 0 0 16px;
-  padding: 10px 16px; /* 适当增加横向内边距，更舒展 */
+<html>
 
-  /* 1. 移除硬边框 */
-  border: none;
-
-  /* 2. M3 规范卡片圆角：推荐 16px (Shape.corner.large) */
-  border-radius: 16px;
-
-  /* 3. 使用 M3 填充色 */
-  background: var(--surface-container-low);
-
-  /* 4. M3 Filled Card 默认不加重阴影（Elevation 0），若需保留层次可用极淡的环境光 */
-  box-shadow: none;
-}
-#author-bar[hidden] { display:none; }
-#author-avatar,
-#author-fallback {
-  width:44px;
-  height:44px;
-  flex:0 0 44px;
-  border-radius:50%;
-}
-#author-avatar[hidden],
-#author-fallback[hidden] { display:none; }
-#author-avatar { object-fit:cover; background:var(--avatar-background); }
-#author-fallback {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:var(--avatar-background);
-  color:var(--avatar-foreground);
-  font-size:18px;
-  font-weight:700;
-  line-height:1;
-}
-#author-info {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:0;
-  flex:1;
-}
-#author-name {
-  flex:0 1 auto;
-  min-width:0;
-  overflow:hidden;
-  color:var(--foreground);
-  font-size:16px;
-  font-weight:600;
-  line-height:22px;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-#author-level {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  flex:0 0 64px;
-  width:64px;
-  height:24px;
-  padding:0 8px;
-  border-radius:6px;
-  background:var(--avatar-background);
-  color:var(--avatar-foreground);
-  font-size:12px;
-  font-weight:600;
-  font-variant-numeric:tabular-nums;
-  line-height:1;
-  white-space:nowrap;
-}
-#author-level[hidden] { display:none; }
-#content { min-width:0; }
-p { margin:0 0 1em; }
-a { color:var(--link); }
-#content img { max-width:100% !important; height:auto !important; }
-video,iframe { max-width:100% !important; }
-figure { margin:1em 0; }
-pre,.table-scroll { max-width:100%; overflow-x:auto; }
-pre { white-space:pre; font-size:14px; }
-table { border-collapse:collapse; }
-td,th { border:1px solid currentColor; padding:6px 10px; }
-blockquote { margin:1em 0; padding-left:16px; border-left:3px solid var(--link); }
-</style></head><body>
-<section id="author-bar" hidden aria-label="作者信息">
-  <img id="author-avatar" alt="" hidden>
-  <span id="author-fallback" aria-hidden="true"></span>
-  <div id="author-info">
-    <div id="author-name"></div>
-    <span id="author-level" hidden></span>
-  </div>
-</section>
-<main id="content"></main>
-<!-- APP_WEB_BRIDGE -->
-<script>
-(() => {
-  const content = document.getElementById('content');
-  const authorBar = document.getElementById('author-bar');
-  const authorAvatar = document.getElementById('author-avatar');
-  const authorFallback = document.getElementById('author-fallback');
-  const authorName = document.getElementById('author-name');
-  const authorLevel = document.getElementById('author-level');
-  let current = null, restoreY = 0, restoring = false, scrollFrame = 0, renderFrame = 0;
-  let authorGeneration = 0;
-  const updateTheme = theme => {
-    const root = document.documentElement;
-    root.style.setProperty('--background', theme.background);
-    root.style.setProperty('--foreground', theme.foreground);
-    root.style.setProperty('--link', theme.link);
-    root.style.setProperty('--surface-container-low', `color-mix(in srgb, ${theme.background} 92%, ${theme.foreground})`);
-    root.style.setProperty('--on-surface-variant', `color-mix(in srgb, ${theme.foreground} 72%, ${theme.background})`);
-    root.style.setProperty('--outline-variant', `color-mix(in srgb, ${theme.foreground} 24%, transparent)`);
-    root.style.setProperty('--avatar-background', `color-mix(in srgb, ${theme.link} 18%, ${theme.background})`);
-    root.style.setProperty('--avatar-foreground', theme.link);
-    root.style.colorScheme = theme.dark ? 'dark' : 'light';
-  };
-  function restore() { if (current && restoring) window.scrollTo(0, restoreY); }
-  function stopRestore() { restoring = false; }
-  const isSafeImageUrl = value => {
-    if (typeof value !== 'string' || !value.trim()) return false;
-    try {
-      const url = new URL(value, document.baseURI);
-      return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch (_) { return false; }
-  };
-  const clearAuthor = () => {
-    authorGeneration++;
-    authorBar.hidden = true;
-    authorBar.removeAttribute('data-author-id');
-    authorAvatar.onload = null;
-    authorAvatar.onerror = null;
-    authorAvatar.removeAttribute('src');
-    authorAvatar.alt = '';
-    authorAvatar.hidden = true;
-    authorFallback.textContent = '';
-    authorFallback.hidden = false;
-    authorName.textContent = '';
-    authorLevel.textContent = '';
-    authorLevel.removeAttribute('aria-label');
-    authorLevel.hidden = true;
-  };
-  const renderAuthor = author => {
-    clearAuthor();
-    if (!author || (!author.id && !author.username && !author.head)) return;
-    const generation = authorGeneration;
-    const username = typeof author.username === 'string' ? author.username.trim() : '';
-    const displayName = username || '未知作者';
-    authorBar.hidden = false;
-    authorBar.dataset.authorId = String(author.id ?? 0);
-    authorName.textContent = displayName;
-    authorFallback.textContent = Array.from(username || '匿')[0] || '匿';
-    if (Number.isInteger(author.level) && author.level >= 1 && author.level <= 100) {
-      authorLevel.textContent = `Lv. ${author.level}`;
-      authorLevel.setAttribute('aria-label', `等级 ${author.level}`);
-      authorLevel.hidden = false;
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base id="content-base" href="about:blank">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #fff;
+      --foreground: #202124;
+      --link: #176b55;
+      --surface-container-low: #f1f4f9;
+      --on-surface-variant: #414750;
+      --outline-variant: #c1c7d2;
+      --outline: #727780;
+      --primary: #176b55;
+      --secondary-container: #d3e8e0;
+      --on-secondary-container: #0a3d30;
+      --avatar-background: #dfe8f5;
+      --avatar-foreground: #176b55;
     }
-    const head = typeof author.head === 'string' ? author.head.trim() : '';
-    if (!isSafeImageUrl(head)) return;
-    authorAvatar.alt = displayName;
-    authorAvatar.onload = () => {
-      if (generation !== authorGeneration) return;
-      authorAvatar.hidden = false;
-      authorFallback.hidden = true;
-    };
-    authorAvatar.onerror = () => {
-      if (generation !== authorGeneration) return;
-      authorAvatar.removeAttribute('src');
-      authorAvatar.hidden = true;
-      authorFallback.hidden = false;
-    };
-    authorAvatar.src = head;
-  };
-  ['touchstart','pointerdown','wheel','keydown'].forEach(name =>
-    document.addEventListener(name, stopRestore, {passive:true}));
-  const observer = new ResizeObserver(restore);
-  const readPosition = () => restoring ? restoreY : window.scrollY;
-  const reset = () => {
-    current = null; restoring = false; restoreY = 0;
-    cancelAnimationFrame(scrollFrame);
-    cancelAnimationFrame(renderFrame);
-    observer.disconnect();
-    content.querySelectorAll('video,audio').forEach(media => media.pause());
-    content.replaceChildren();
-    clearAuthor();
-    window.scrollTo(0,0);
-  };
-  window.AppContentTemplate = {
-    updateTheme,
-    captureState: () => ({scrollY:readPosition()}),
-    reset,
-    render(payload, context) {
-      reset();
-      current = context;
-      document.getElementById('content-base').href = payload.baseUrl;
-      updateTheme(payload.theme);
-      renderAuthor(payload.templateData?.author);
-      restoreY = Math.max(0, payload.scrollY || 0); restoring = true;
-      content.innerHTML = payload.html;
-      content.querySelectorAll('img').forEach(img => {
-        if (!img.getAttribute('src') && img.dataset.src) img.src = img.dataset.src;
-      });
-      content.querySelectorAll('table').forEach(table => {
-        const wrapper = document.createElement('div'); wrapper.className = 'table-scroll';
-        table.before(wrapper); wrapper.append(table);
-      });
-      observer.observe(content);
-      content.addEventListener('load', restore, {capture:true, signal:context.signal});
-      content.addEventListener('error', restore, {capture:true, signal:context.signal});
-      window.addEventListener('scroll', () => {
-        cancelAnimationFrame(scrollFrame);
-        scrollFrame = requestAnimationFrame(() => context.emit('scroll', {y:readPosition()}));
-      }, {passive:true, signal:context.signal});
-      content.addEventListener('click', event => {
-    const target = event.target instanceof Element ? event.target : event.target.parentElement;
-    const image = target?.closest('img');
-    if (image) {
-      event.preventDefault();
-      const images = [...content.querySelectorAll('img')];
-      const urls = images.map(img => new URL(img.dataset.original || img.currentSrc || img.src, document.baseURI).href);
-      context.emit('imageClick', {urls, index:images.indexOf(image)}); return;
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #171717;
+        --foreground: #e8e8e8;
+        --link: #8fd9bc;
+        --surface-container-low: #242424;
+        --on-surface-variant: #c7c7c7;
+        --outline-variant: #4a4a4a;
+        --outline: #8e9094;
+        --primary: #8fd9bc;
+        --secondary-container: #2a473d;
+        --on-secondary-container: #b6ead6;
+        --avatar-background: #34443f;
+        --avatar-foreground: #b6ead6;
+      }
     }
-    const anchor = target?.closest('a[href]');
-    if (!anchor) return;
-    event.preventDefault();
-    const url = new URL(anchor.href, document.baseURI);
-    const base = new URL(document.baseURI);
-    if (url.origin === base.origin && url.pathname === base.pathname && url.search === base.search && url.hash) {
-      stopRestore();
-      document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView();
-    } else context.emit('linkClick', {url:url.href});
-      }, {signal:context.signal});
-      context.signal.addEventListener('abort', () => { if (current === context) reset(); }, {once:true});
-      return new Promise(resolve => {
-        const finish = () => resolve();
-        context.signal.addEventListener('abort', finish, {once:true});
-        renderFrame = requestAnimationFrame(() => {
-          context.signal.removeEventListener('abort', finish);
-          if (context.isCurrent()) restore();
-          resolve();
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--background);
+      color: var(--foreground);
+      overflow-wrap: anywhere;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      font: 17px/1.75 system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    #author-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      margin: 0 0 16px;
+      padding: 10px 16px; /* 适当增加横向内边距，更舒展 */
+
+      /* 1. 移除硬边框 */
+      border: none;
+
+      /* 2. M3 规范卡片圆角：推荐 16px (Shape.corner.large) */
+      border-radius: 16px;
+
+      /* 3. 使用 M3 填充色 */
+      background: var(--surface-container-low);
+
+      /* 4. M3 Filled Card 默认不加重阴影（Elevation 0），若需保留层次可用极淡的环境光 */
+      box-shadow: none;
+    }
+
+    #author-bar[hidden] {
+      display: none;
+    }
+
+    #author-avatar,
+    #author-fallback {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 50%;
+    }
+
+    #author-avatar[hidden],
+    #author-fallback[hidden] {
+      display: none;
+    }
+
+    #author-avatar {
+      object-fit: cover;
+      background: var(--avatar-background);
+    }
+
+    #author-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--avatar-background);
+      color: var(--avatar-foreground);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    #author-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    #author-name {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      color: var(--foreground);
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 22px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #author-level {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 64px;
+      width: 64px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: var(--avatar-background);
+      color: var(--avatar-foreground);
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    #author-level[hidden] {
+      display: none;
+    }
+
+    #content {
+      min-width: 0;
+    }
+
+    p {
+      margin: 0 0 1em;
+    }
+
+    a {
+      color: var(--link);
+    }
+
+    #content img {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+
+    video,
+    iframe {
+      max-width: 100% !important;
+    }
+
+    figure {
+      margin: 1em 0;
+    }
+
+    pre,
+    .table-scroll {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    pre {
+      white-space: pre;
+      font-size: 14px;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    td,
+    th {
+      border: 1px solid currentColor;
+      padding: 6px 10px;
+    }
+
+    blockquote {
+      margin: 1em 0;
+      padding-left: 16px;
+      border-left: 3px solid var(--link);
+    }
+
+    /* Deck card: M3 filled card (16dp radius, surface-container-low, elevation 0). */
+    .yingdi-deck {
+      display: block;
+      margin: 1.25em 0;
+      border-radius: 16px;
+      background: var(--surface-container-low);
+      overflow: hidden;
+    }
+
+    .yingdi-deck[hidden] {
+      display: none;
+    }
+
+    .yingdi-deck .deck-image {
+      display: block;
+      line-height: 0;
+      background: var(--outline-variant);
+    }
+
+    .yingdi-deck .deck-image[hidden] {
+      display: none;
+    }
+
+    .yingdi-deck .deck-image img {
+      display: block;
+      width: 100% !important;
+      height: auto !important;
+      max-width: 100% !important;
+      margin: 0;
+    }
+
+    /* The deck code is data only; never paint it, even if author CSS unhides it. */
+    .yingdi-deck aside {
+      display: none !important;
+    }
+
+    .yingdi-deck .deck-actions {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      padding: 12px 16px 16px;
+    }
+
+    .yingdi-deck .deck-actions[hidden] {
+      display: none;
+    }
+
+    .yingdi-deck button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 0;
+      height: 40px;
+      margin: 0;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 20px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .yingdi-deck button[hidden] {
+      display: none;
+    }
+
+    .yingdi-deck button svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      fill: currentColor;
+    }
+
+    /* Keyboard focus ring. Click focus is cleared in JS; the :focus rules below erase its state layer. */
+    .yingdi-deck button:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .yingdi-deck .deck-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .yingdi-deck .copy-code {
+      flex: 1 1 0;
+      background: var(--secondary-container);
+      color: var(--on-secondary-container);
+    }
+
+    .yingdi-deck .copy-code:hover,
+    .yingdi-deck .copy-code:active {
+      background: color-mix(in srgb, var(--on-secondary-container) 8%, var(--secondary-container));
+    }
+
+    .yingdi-deck .deck-link {
+      flex: 1 1 0;
+      color: var(--primary);
+      box-shadow: inset 0 0 0 1px var(--outline);
+    }
+
+    .yingdi-deck .deck-link:hover,
+    .yingdi-deck .deck-link:active {
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+    }
+
+    @media (max-width: 360px) {
+      .yingdi-deck .deck-actions {
+        justify-content: flex-end;
+        padding: 12px;
+      }
+
+      .yingdi-deck button {
+        flex: 0 0 40px;
+        width: 40px;
+        padding: 0;
+      }
+
+      .yingdi-deck .deck-label {
+        display: none;
+      }
+    }
+
+    /* If a tapped control ever stays focused, :focus would repaint the hover/pressed colour and
+       the outline inset. Restore the idle look for unfocused-state parity. */
+    @media (hover: none) {
+      .yingdi-deck button:focus:not(:active) {
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .yingdi-deck .copy-code:focus:not(:active) {
+        background: var(--secondary-container);
+      }
+
+      .yingdi-deck .deck-link:focus:not(:active) {
+        box-shadow: inset 0 0 0 1px var(--outline);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .yingdi-deck button {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section id="author-bar" hidden aria-label="作者信息">
+    <img id="author-avatar" alt="" hidden>
+    <span id="author-fallback" aria-hidden="true"></span>
+    <div id="author-info">
+      <div id="author-name"></div>
+      <span id="author-level" hidden></span>
+    </div>
+  </section>
+  <main id="content"></main>
+  <!-- APP_WEB_BRIDGE -->
+  <script>
+    (() => {
+      'use strict';
+      const content = document.getElementById('content');
+      const authorBar = document.getElementById('author-bar');
+      const authorAvatar = document.getElementById('author-avatar');
+      const authorFallback = document.getElementById('author-fallback');
+      const authorName = document.getElementById('author-name');
+      const authorLevel = document.getElementById('author-level');
+
+      let current = null;
+      let restoreTarget = null;
+      let latestPosition = { scrollY: 0 };
+      let viewport = '';
+      let inputUntil = 0;
+      let blocks = [];
+      const blockIndex = new Map();
+      let scrollFrame = 0;
+      let renderFrame = 0;
+      let authorGeneration = 0;
+
+      const updateTheme = (theme) => {
+        const root = document.documentElement;
+        root.style.setProperty('--background', theme.background);
+        root.style.setProperty('--foreground', theme.foreground);
+        root.style.setProperty('--link', theme.link);
+        root.style.setProperty(
+          '--surface-container-low',
+          `color-mix(in srgb, ${theme.background} 92%, ${theme.foreground})`
+        );
+        root.style.setProperty(
+          '--on-surface-variant',
+          `color-mix(in srgb, ${theme.foreground} 72%, ${theme.background})`
+        );
+        root.style.setProperty(
+          '--outline-variant',
+          `color-mix(in srgb, ${theme.foreground} 24%, transparent)`
+        );
+        root.style.setProperty(
+          '--avatar-background',
+          `color-mix(in srgb, ${theme.link} 18%, ${theme.background})`
+        );
+        root.style.setProperty('--avatar-foreground', theme.link);
+        root.style.setProperty('--primary', theme.link);
+        root.style.setProperty('--outline', `color-mix(in srgb, ${theme.foreground} 50%, ${theme.background})`);
+        root.style.setProperty(
+          '--secondary-container',
+          `color-mix(in srgb, ${theme.link} 16%, ${theme.background})`
+        );
+        root.style.setProperty(
+          '--on-secondary-container',
+          `color-mix(in srgb, ${theme.link} 70%, ${theme.foreground})`
+        );
+        root.style.colorScheme = theme.dark ? 'dark' : 'light';
+      };
+
+      const blockSelector = 'p,h1,h2,h3,h4,h5,h6,li,img,blockquote,pre,table,figure,video,iframe';
+
+      const markerOf = (element) => {
+        const images = element.matches('img') ? [element] : [...element.querySelectorAll('img')];
+        const value = element.tagName + '|' + (element.textContent || '').replace(/\s+/g, ' ').trim() +
+          '|' + images.map((img) => img.dataset.original || img.dataset.src || img.getAttribute('src') || '').join('|');
+        let hash = 2166136261;
+        for (let index = 0; index < value.length; index++) {
+          hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+        }
+        return element.tagName + ':' + value.length + ':' + (hash >>> 0).toString(16);
+      };
+
+      const indexBlocks = () => {
+        blocks = [...content.querySelectorAll(blockSelector)].map((element) => {
+          const path = [];
+          for (let node = element; node !== content; node = node.parentElement) {
+            path.unshift(Array.prototype.indexOf.call(node.parentElement.children, node));
+          }
+          const block = { element, path, marker: markerOf(element) };
+          blockIndex.set(element, block);
+          return block;
         });
+      };
+
+      const normalizePosition = (position) => {
+        const result = { scrollY: Number.isFinite(position?.scrollY) ? Math.max(0, position.scrollY) : 0 };
+        const anchor = position?.anchor;
+        if (anchor && Array.isArray(anchor.path) && anchor.path.length > 0 && anchor.path.length <= 64 &&
+          anchor.path.every((index) => Number.isInteger(index) && index >= 0) &&
+          typeof anchor.marker === 'string' && anchor.marker.length > 0 && anchor.marker.length <= 128 &&
+          Number.isFinite(anchor.fraction)) {
+          result.anchor = {
+            path: anchor.path, marker: anchor.marker, fraction: Math.max(0, Math.min(1, anchor.fraction)),
+          };
+        }
+        return result;
+      };
+
+      const measurePosition = () => {
+        const scrollY = Math.max(0, window.scrollY);
+        const result = { scrollY };
+        if (!scrollY || content.getBoundingClientRect().top > 0) return result;
+        let element = document.elementFromPoint(document.documentElement.clientWidth / 2, 1);
+        let selected = null;
+        while (element && element !== content) {
+          if (blockIndex.has(element)) {
+            selected = blockIndex.get(element);
+            break;
+          }
+          element = element.parentElement;
+        }
+        if (!selected) {
+          let distance = Infinity;
+          for (const block of blocks) {
+            const rect = block.element.getBoundingClientRect();
+            if (rect.height <= 0) continue;
+            const gap = Math.max(rect.top, -rect.bottom, 0);
+            if (rect.top > 0 && selected && gap > distance) break;
+            if (gap <= distance) {
+              selected = block;
+              distance = gap;
+            }
+          }
+        }
+        if (selected) {
+          const rect = selected.element.getBoundingClientRect();
+          if (rect.height > 0 && selected.path.length <= 64) result.anchor = {
+            path: selected.path, marker: selected.marker,
+            fraction: Math.max(0, Math.min(1, -rect.top / rect.height)),
+          };
+        }
+        return result;
+      };
+
+      // Detect reflow before a resize-induced scroll event can replace the old anchor.
+      const updateViewport = () => {
+        const size = `${content.clientWidth}:${window.innerHeight}`;
+        if (size === viewport) return false;
+        if (viewport && !restoreTarget && performance.now() >= inputUntil) restoreTarget = latestPosition;
+        viewport = size;
+        return true;
+      };
+
+      function restore() {
+        if (!current) return;
+        updateViewport();
+        if (!restoreTarget) {
+          latestPosition = measurePosition();
+          return;
+        }
+        document.documentElement.style.overflowAnchor = 'none';
+        let y = restoreTarget.scrollY;
+        const anchor = restoreTarget.anchor;
+        if (anchor) {
+          let element = content;
+          for (const index of anchor.path) element = element?.children[index];
+          if (element && markerOf(element) === anchor.marker) {
+            const rect = element.getBoundingClientRect();
+            if (rect.height > 0) y = window.scrollY + rect.top + rect.height * anchor.fraction;
+          }
+        }
+        const root = document.scrollingElement || document.documentElement;
+        const maxY = Math.max(0, root.scrollHeight - root.clientHeight);
+        window.scrollTo(0, Math.max(0, Math.min(maxY, y)));
+      }
+
+      const readPosition = () => {
+        if (!current) return { scrollY: 0 };
+        if (updateViewport()) restore();
+        // Keep the target while images are incomplete, even if the document is temporarily short.
+        if (restoreTarget) return restoreTarget;
+        latestPosition = measurePosition();
+        return latestPosition;
+      };
+
+      const reportPosition = () => current?.emit('scroll', { position: readPosition() });
+
+      function stopRestore(event) {
+        if (!current) return;
+        if (event?.type === 'pointermove' && !event.buttons) return;
+        restoreTarget = null;
+        document.documentElement.style.removeProperty('overflow-anchor');
+        inputUntil = performance.now() + 250;
+        latestPosition = measurePosition();
+      }
+
+      const isSafeImageUrl = (value) => {
+        if (typeof value !== 'string' || !value.trim()) return false;
+        try {
+          const url = new URL(value, document.baseURI);
+          return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      // 24-unit paths for the deck card buttons, so web and native icons share the same artwork.
+      const DECK_ICONS = {
+        // Material Symbols content_copy, transcribed one-for-one from the Compose ImageVector:
+        // moveTo -> M, quadTo -> Q, reflectiveQuadTo -> T, horizontal/verticalLineTo -> H/V,
+        // horizontal/verticalLineToRelative -> h/v, close -> Z. Compose's reflectiveQuadTo reflects
+        // the previous control point exactly like SVG's T, so the curves are preserved.
+        // The builder ends with a redundant "verticalLineTo(4) verticalLineTo(16) close" subpath of
+        // zero area; it is omitted because it paints nothing.
+        // The outer and inner subpaths wind in opposite directions, so the nonzero fill-rule cuts
+        // the front sheet into an outline; the back sheet stays solid.
+        copy: [
+          'M9 18', 'Q8.18 18 7.59 17.41', 'T7 16', 'V4',
+          'Q7 3.17 7.59 2.59', 'T9 2', 'h9',
+          'q0.82 0 1.41 0.59', 'T20 4', 'V16',
+          'q0 0.82 -0.59 1.41', 'T18 18', 'H9', 'Z',
+          'M9 16', 'h9', 'V4', 'H9', 'V16', 'Z',
+          'M5 22', 'Q4.18 22 3.59 21.41', 'T3 20', 'V6',
+          'H5', 'V20', 'H16', 'v2', 'H5', 'Z',
+        ].join(' '),
+        // arrow_forward
+        link: 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z',
+      };
+
+      // Deck images are presentation for the card and must not join the article gallery.
+      const articleImages = () => [...content.querySelectorAll('img')].filter(
+        (img) => !img.closest('.yingdi-deck')
+      );
+
+      const createIcon = (name) => {
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', DECK_ICONS[name]);
+        svg.append(path);
+        return svg;
+      };
+
+      const setDeckLabel = (button, label, defaultText) => {
+        const text = (label?.textContent || '').trim() || defaultText;
+        label.textContent = text;
+        button.setAttribute('aria-label', text);
+      };
+
+      // Turn the article's .yingdi-deck markup into an M3 card: cover image, hidden code, actions.
+      const prepareDecks = () => {
+        content.querySelectorAll('.yingdi-deck').forEach((deck) => {
+          if (deck.dataset.appDeck === 'true') return;
+          deck.dataset.appDeck = 'true';
+          deck.removeAttribute('contenteditable');
+
+          const code = (deck.querySelector('aside')?.textContent || '').trim();
+          const cover = deck.querySelector('.deck-image');
+          const image = cover?.querySelector('img');
+          if (image) {
+            const source = image.dataset.original || image.dataset.src || image.getAttribute('src');
+            if (source) image.setAttribute('src', source);
+            // Author inline handlers are not trusted; replace with local error handling.
+            image.removeAttribute('onerror');
+            image.setAttribute('alt', '');
+            image.setAttribute('loading', 'lazy');
+            image.setAttribute('decoding', 'async');
+            image.addEventListener('error', () => { if (cover) cover.hidden = true; });
+          } else if (cover) {
+            cover.hidden = true;
+          }
+
+          const aside = deck.querySelector('aside');
+          if (aside) aside.hidden = true;
+
+          const link = deck.querySelector('.deck-link');
+          const type = link?.getAttribute('data-type')?.trim() || '';
+          const game = link?.getAttribute('data-game')?.trim() || '';
+          const id = link?.getAttribute('data-id')?.trim() || '';
+
+          let actions = deck.querySelector('.deck-actions');
+          if (!actions) {
+            actions = document.createElement('div');
+            actions.className = 'deck-actions';
+            const legacy = deck.querySelector('.action-button');
+            if (legacy) legacy.replaceWith(actions);
+            else deck.append(actions);
+          }
+          actions.hidden = false;
+
+          let copyButton = actions.querySelector('.copy-code');
+          if (copyButton) {
+            copyButton.type = 'button';
+            copyButton.hidden = !code;
+          } else if (code) {
+            copyButton = document.createElement('button');
+            copyButton.type = 'button';
+            copyButton.className = 'copy-code';
+            actions.append(copyButton);
+          }
+          if (copyButton) {
+            if (!copyButton.querySelector('svg')) copyButton.prepend(createIcon('copy'));
+            let label = copyButton.querySelector('.deck-label');
+            if (!label) {
+              label = document.createElement('span');
+              label.className = 'deck-label';
+              copyButton.append(label);
+            }
+            setDeckLabel(copyButton, label, '复制代码');
+          }
+
+          let linkButton = actions.querySelector('.deck-link');
+          const linkAvailable = Boolean(game || id);
+          if (linkButton) {
+            linkButton.type = 'button';
+            linkButton.hidden = !linkAvailable;
+          } else if (linkAvailable) {
+            linkButton = document.createElement('button');
+            linkButton.type = 'button';
+            linkButton.className = 'deck-link';
+            if (type) linkButton.dataset.type = type;
+            if (game) linkButton.dataset.game = game;
+            if (id) linkButton.dataset.id = id;
+            actions.append(linkButton);
+          }
+          if (linkButton) {
+            let label = linkButton.querySelector('.deck-label');
+            if (!linkButton.querySelector('svg')) {
+              linkButton.prepend(createIcon('link'));
+              if (!label) {
+                label = document.createElement('span');
+                label.className = 'deck-label';
+                linkButton.append(label);
+              }
+            }
+            if (!label) {
+              label = document.createElement('span');
+              label.className = 'deck-label';
+              linkButton.append(label);
+            }
+            setDeckLabel(linkButton, label, '跳转详情');
+          }
+
+          if (!copyButton && !linkButton) actions.hidden = true;
+        });
+      };
+
+      // Deck actions read only DOM text/attributes; they never echo markup back to the host.
+      const handleDeckClick = (event, target, context) => {
+        const button = target?.closest('.yingdi-deck button.copy-code, .yingdi-deck button.deck-link');
+        if (!button) return false;
+        event.preventDefault();
+        event.stopPropagation();
+        const deck = button.closest('.yingdi-deck');
+        if (button.classList.contains('copy-code')) {
+          const code = (deck?.querySelector('aside')?.textContent || '').trim();
+          if (code) context.emit('templateMessage', { name: 'newsDeck', payload: { action: 'copy', code } });
+        } else {
+          const type = button.getAttribute('data-type');
+          const game = button.getAttribute('data-game');
+          const id = button.getAttribute('data-id');
+          if (game || id) {
+            context.emit('templateMessage', { name: 'newsDeck', payload: { action: 'link', type, game, id } });
+          }
+        }
+        return true;
+      };
+
+      const clearAuthor = () => {
+        authorGeneration++;
+        authorBar.hidden = true;
+        authorBar.removeAttribute('data-author-id');
+        authorAvatar.onload = null;
+        authorAvatar.onerror = null;
+        authorAvatar.removeAttribute('src');
+        authorAvatar.alt = '';
+        authorAvatar.hidden = true;
+        authorFallback.textContent = '';
+        authorFallback.hidden = false;
+        authorName.textContent = '';
+        authorLevel.textContent = '';
+        authorLevel.removeAttribute('aria-label');
+        authorLevel.hidden = true;
+      };
+
+      const renderAuthor = (author) => {
+        clearAuthor();
+        if (!author || (!author.id && !author.username && !author.head)) return;
+        const generation = authorGeneration;
+        const username = typeof author.username === 'string' ? author.username.trim() : '';
+        const displayName = username || '未知作者';
+
+        authorBar.hidden = false;
+        authorBar.dataset.authorId = String(author.id ?? 0);
+        authorName.textContent = displayName;
+        authorFallback.textContent = Array.from(username || '匿')[0] || '匿';
+
+        if (Number.isInteger(author.level) && author.level >= 1 && author.level <= 100) {
+          authorLevel.textContent = `Lv. ${author.level}`;
+          authorLevel.setAttribute('aria-label', `等级 ${author.level}`);
+          authorLevel.hidden = false;
+        }
+
+        const head = typeof author.head === 'string' ? author.head.trim() : '';
+        if (!isSafeImageUrl(head)) return;
+        authorAvatar.alt = displayName;
+        authorAvatar.onload = () => {
+          if (generation !== authorGeneration) return;
+          authorAvatar.hidden = false;
+          authorFallback.hidden = true;
+        };
+        authorAvatar.onerror = () => {
+          if (generation !== authorGeneration) return;
+          authorAvatar.removeAttribute('src');
+          authorAvatar.hidden = true;
+          authorFallback.hidden = false;
+        };
+        authorAvatar.src = head;
+      };
+
+      ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove',
+        'pointerup', 'pointercancel', 'wheel', 'keydown'].forEach((name) =>
+        document.addEventListener(name, stopRestore, { passive: true })
+      );
+
+      const observer = new ResizeObserver(restore);
+
+      const reset = () => {
+        current = null;
+        restoreTarget = null;
+        document.documentElement.style.removeProperty('overflow-anchor');
+        latestPosition = { scrollY: 0 };
+        viewport = '';
+        inputUntil = 0;
+        blocks = [];
+        blockIndex.clear();
+        cancelAnimationFrame(scrollFrame);
+        cancelAnimationFrame(renderFrame);
+        observer.disconnect();
+        content.querySelectorAll('video,audio').forEach((media) => media.pause());
+        // A removed control keeps document.activeElement, so drop focus before replacing the body.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        content.replaceChildren();
+        clearAuthor();
+        window.scrollTo(0, 0);
+      };
+
+      // Deck buttons must not keep focus after a tap: Chromium keeps :focus on the control, which
+      // repaints the state layer and leaves an active-looking card action behind.
+      function releaseDeckFocus(element) {
+        if (!(element instanceof Element)) return;
+        const button = element.closest('.yingdi-deck button');
+        if (button && !button.matches(':active')) button.blur();
+      }
+
+      content.addEventListener('click', (event) => {
+        releaseDeckFocus(event.target);
+        const focused = document.activeElement;
+        if (focused instanceof Element && !focused.matches(':active')) releaseDeckFocus(focused);
       });
-    }
-  };
-})();
-</script></body></html>
+
+      const handleClick = (event, context) => {
+        const target = event.target instanceof Element ? event.target : event.target.parentElement;
+
+        if (handleDeckClick(event, target, context)) return;
+
+        const image = target?.closest('img');
+        if (image) {
+          event.preventDefault();
+          const images = articleImages();
+          const index = images.indexOf(image);
+          // Deck covers are card decoration and never open the gallery.
+          if (index < 0) return;
+          const urls = images.map(
+            (img) => new URL(img.dataset.original || img.dataset.src || img.currentSrc || img.src, document.baseURI).href
+          );
+          const position = readPosition();
+          context.emit('scroll', { position });
+          context.emit('imageClick', { urls, index, position });
+          return;
+        }
+
+        const anchor = target?.closest('a[href]');
+        if (!anchor) return;
+        event.preventDefault();
+
+        const url = new URL(anchor.href, document.baseURI);
+        const base = new URL(document.baseURI);
+        const isSameDocumentAnchor =
+          url.origin === base.origin &&
+          url.pathname === base.pathname &&
+          url.search === base.search &&
+          url.hash;
+
+        if (isSameDocumentAnchor) {
+          stopRestore();
+          document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView();
+        } else {
+          context.emit('linkClick', { url: url.href });
+        }
+      };
+
+      window.AppContentTemplate = {
+        updateTheme,
+        captureState: readPosition,
+        reset,
+
+        render(payload, context) {
+          reset();
+          current = context;
+          document.getElementById('content-base').href = payload.baseUrl;
+          updateTheme(payload.theme);
+          renderAuthor(payload.templateData?.author);
+
+          restoreTarget = normalizePosition(payload.position || { scrollY: payload.scrollY });
+          document.documentElement.style.overflowAnchor = 'none';
+          latestPosition = restoreTarget;
+          content.innerHTML = payload.html;
+
+          content.querySelectorAll('img').forEach((img) => {
+            if (!img.getAttribute('src') && img.dataset.src) img.src = img.dataset.src;
+          });
+
+          prepareDecks();
+
+          content.querySelectorAll('table').forEach((table) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-scroll';
+            table.before(wrapper);
+            wrapper.append(table);
+          });
+
+          indexBlocks();
+          updateViewport();
+          observer.observe(content);
+          content.addEventListener('load', restore, { capture: true, signal: context.signal });
+          content.addEventListener('error', restore, { capture: true, signal: context.signal });
+          window.addEventListener('resize', restore, { passive: true, signal: context.signal });
+          document.addEventListener('visibilitychange', () => {
+            if (document.hidden) reportPosition();
+          }, { signal: context.signal });
+          window.addEventListener('pagehide', reportPosition, { signal: context.signal });
+          document.fonts?.ready.then(() => { if (context.isCurrent()) restore(); });
+
+          window.addEventListener(
+            'scroll',
+            () => {
+              // Native/Compose inertia continues after the last DOM touch event.
+              if (performance.now() < inputUntil) inputUntil = performance.now() + 250;
+              cancelAnimationFrame(scrollFrame);
+              scrollFrame = requestAnimationFrame(reportPosition);
+            },
+            { passive: true, signal: context.signal }
+          );
+
+          content.addEventListener('click', (event) => handleClick(event, context), {
+            signal: context.signal,
+          });
+
+          context.signal.addEventListener(
+            'abort',
+            () => {
+              if (current === context) reset();
+            },
+            { once: true }
+          );
+
+          return new Promise((resolve) => {
+            const finish = () => resolve();
+            context.signal.addEventListener('abort', finish, { once: true });
+            renderFrame = requestAnimationFrame(() => {
+              context.signal.removeEventListener('abort', finish);
+              if (context.isCurrent()) restore();
+              resolve();
+            });
+          });
+        },
+      };
+    })();
+  </script>
+</body>
+
+</html>

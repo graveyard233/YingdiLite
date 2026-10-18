@@ -25,6 +25,8 @@ internal const val APP_ROUTE_KEY = "com.graveyard.yingdilite.route"
 internal const val APP_TOP_LEVEL_KEY = "com.graveyard.yingdilite.topLevel"
 internal const val APP_PRESENTATION_KEY = "com.graveyard.yingdilite.presentation"
 
+private const val NEWS_READING_WORKSPACE_KEY = "news-reading-workspace"
+
 internal data class AppScenePresentation(
     val layoutMode: NewsLayoutMode?,
     val showsApplicationNavigation: Boolean,
@@ -74,7 +76,7 @@ internal data class NewsScene(
     // A wide reading workspace remains stable when the selected article changes.
     override val key: Any = when (layout.mode) {
         NewsLayoutMode.Feed -> "news-feed"
-        else -> "news-reading-workspace"
+        else -> NEWS_READING_WORKSPACE_KEY
     }
     override val entries = buildList {
         if (layout.list != null) add(feedEntry)

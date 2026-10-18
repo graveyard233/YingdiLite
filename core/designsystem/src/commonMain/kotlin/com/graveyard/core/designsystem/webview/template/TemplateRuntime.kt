@@ -58,9 +58,15 @@ internal class TemplateRuntime(
     private var reading: RichContentReadingState.Binding? = null
     private var callback: ((RichContentEvent) -> Unit)? = null
     private var renderTimeout: Job? = null
-    private data class Pending(val identity: JsonObject, val result: CompletableDeferred<JsonObject>)
+    private data class Pending(
+        val identity: JsonObject,
+        val result: CompletableDeferred<JsonObject>,
+        val binding: RichContentReadingState.Binding?,
+        val generation: Long?,
+    )
     private val pending = mutableMapOf<Long, Pending>()
-    private var snapshot: Pair<RichContentReadingState.Binding, CompletableDeferred<JsonObject>>? = null
+    private var snapshot: CompletableDeferred<JsonObject>? = null
+    private var checkpoint: Job? = null
     override var broken = false
         private set
 
@@ -94,7 +100,7 @@ internal class TemplateRuntime(
         if (leaseId == 0L || broken || destroyed) return
         val changed = document != content
         val themeChanged = theme != colors
-        if (document?.key != content.key) {
+        if (changed) {
             reading = readingState?.bind(ReadingKey(template.id, template.revision, template.protocolVersion, content.key))
         }
         document = content
@@ -115,6 +121,7 @@ internal class TemplateRuntime(
             put("html", content.html)
             put("baseUrl", content.baseUrl)
             put("scrollY", reading?.offset ?: 0.0)
+            reading?.value?.let { put("position", it) }
             put("theme", themeJson(colors))
             put("templateData", content.templateData)
         })
@@ -146,13 +153,30 @@ internal class TemplateRuntime(
         return id
     }
 
-    private fun request(command: String): CompletableDeferred<JsonObject> {
+    private fun request(command: String, binding: RichContentReadingState.Binding? = null): CompletableDeferred<JsonObject> {
         val id = ++requestId
         val message = envelope(command, JsonObject(emptyMap()), id)
         val result = CompletableDeferred<JsonObject>()
-        pending[id] = Pending(message, result)
+        pending[id] = Pending(message, result, binding, binding?.generation)
         dispatch(message)
         return result
+    }
+
+    fun captureReadingPosition() {
+        if (leaseId == 0L || !ready.isCompleted || broken || destroyed || document == null || checkpoint?.isActive == true) return
+        val result = request("captureState", reading)
+        checkpoint = scope.launch {
+            try {
+                withTimeoutOrNull(2_000) { result.await() }
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: Exception) {
+                // A checkpoint is supplemental; regular scroll events already save the position.
+            } finally {
+                pending.entries.removeAll { it.value.result === result }
+                result.cancel()
+            }
+        }
     }
 
     private fun receive(raw: String) {
@@ -173,7 +197,13 @@ internal class TemplateRuntime(
             if (event == expected || event == "error") {
                 pending.remove(message.number("request"))
                 if (event == "error") operation.result.completeExceptionally(IllegalStateException("Template hook failed"))
-                else operation.result.complete(message["data"] as? JsonObject ?: JsonObject(emptyMap()))
+                else {
+                    val data = message["data"] as? JsonObject ?: JsonObject(emptyMap())
+                    operation.binding?.let { binding ->
+                        if (binding.generation == operation.generation) binding.update(data)
+                    }
+                    operation.result.complete(data)
+                }
                 return
             }
         }
@@ -183,9 +213,10 @@ internal class TemplateRuntime(
         val data = message["data"] as? JsonObject ?: JsonObject(emptyMap())
         when (event) {
             "rendered" -> { renderTimeout?.cancel(); callback?.invoke(RichContentEvent.Rendered) }
-            "scroll" -> (data["y"] as? JsonPrimitive)?.doubleOrNull?.let { reading?.update(it) }
+            "scroll" -> data.readingPosition()?.let { reading?.update(it) }
             "linkClick" -> data.text("url")?.let { callback?.invoke(RichContentEvent.LinkClick(it)) }
             "imageClick" -> {
+                data.readingPosition()?.let { reading?.update(it) }
                 val urls = (data["urls"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: return
                 val index = (data["index"] as? JsonPrimitive)?.intOrNull ?: return
                 if (index in urls.indices) callback?.invoke(RichContentEvent.ImageClick(urls, index))
@@ -206,7 +237,7 @@ internal class TemplateRuntime(
 
     override fun unbind() {
         if (leaseId == 0L) return
-        if (ready.isCompleted && !broken && document != null) reading?.let { snapshot = it to request("captureState") }
+        if (ready.isCompleted && !broken && document != null) snapshot = request("captureState", reading)
         leaseId = 0L
         callback = null
         reading = null
@@ -220,9 +251,7 @@ internal class TemplateRuntime(
     override suspend fun recycle(): Boolean {
         if (broken || destroyed || !ready.isCompleted) return false
         return withTimeoutOrNull(2_000) {
-            snapshot?.let { (binding, result) ->
-                (result.await()["scrollY"] as? JsonPrimitive)?.doubleOrNull?.let(binding::update)
-            }
+            snapshot?.await()
             snapshot = null
             request("reset").await()
             !broken && !destroyed
@@ -250,6 +279,8 @@ internal class TemplateRuntime(
 
 private fun JsonObject.text(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull
 private fun JsonObject.number(key: String) = (this[key] as? JsonPrimitive)?.longOrNull
+private fun JsonObject.readingPosition(): JsonObject? = (this["position"] as? JsonObject)
+    ?: (this["y"] as? JsonPrimitive)?.doubleOrNull?.let { y -> buildJsonObject { put("scrollY", y) } }
 private fun themeJson(theme: RichContentTheme) = buildJsonObject {
     put("background", theme.background)
     put("foreground", theme.foreground)

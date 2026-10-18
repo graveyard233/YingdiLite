@@ -5,11 +5,40 @@ import com.graveyard.core.designsystem.navigation.Navigator
 import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.NewsRoute
+import com.graveyard.yingdilite.navigation.ImageGalleryRoute
 
 /** Extension in the assembly layer avoids a core:designsystem -> feature:news dependency. */
-internal fun Navigator.selectArticle(articleId: String, articleTitle: String, newsAuthor: NewsAuthor) {
+internal fun Navigator.selectArticle(
+    articleId: String,
+    articleTitle: String,
+    newsAuthor: NewsAuthor = NewsAuthor(),
+    replyNum: String = "",
+    likeNum: String = "",
+) {
     if (state.currentTopLevelKey != NewsRoute) return
-    replaceSelectedArticle(state.currentSubStack, ArticleRoute(articleId, articleTitle, newsAuthor))
+    replaceSelectedArticle(
+        state.currentSubStack,
+        ArticleRoute(
+            articleId = articleId,
+            articleTitle = articleTitle,
+            newsAuthor = newsAuthor,
+            replyNum = replyNum,
+            likeNum = likeNum,
+        ),
+    )
+}
+
+/** Opens the article image gallery on top of the reading scene. */
+internal fun Navigator.openImages(
+    urls: List<String>,
+    index: Int,
+) {
+    if (state.currentTopLevelKey != NewsRoute) return
+    if (urls.isEmpty() || index !in urls.indices) return
+    // A second tap while the gallery is already open must not stack another copy.
+    if (state.currentSubStack.lastOrNull() is ImageGalleryRoute) return
+    if (state.currentSubStack.lastOrNull() !is ArticleRoute) return
+    navigate(ImageGalleryRoute(urls, index))
 }
 
 internal fun replaceSelectedArticle(stack: MutableList<NavKey>, article: ArticleRoute) {

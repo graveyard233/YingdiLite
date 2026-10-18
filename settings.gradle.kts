@@ -30,6 +30,7 @@ dependencyResolutionManagement {
                 includeGroupAndSubgroups("org.jetbrains")
                 includeGroupAndSubgroups("io.ktor")
                 includeGroupAndSubgroups("io.coil-kt")
+                includeGroupAndSubgroups("net.engawapg.lib")
             }
         }
         google {

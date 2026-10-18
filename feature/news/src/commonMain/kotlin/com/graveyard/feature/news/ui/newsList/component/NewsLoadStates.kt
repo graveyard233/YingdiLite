@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +23,7 @@ import androidx.paging.LoadState
 import com.graveyard.core.designsystem.icons.AppIcon
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.news_dismiss
 import yingdilite.feature.news.generated.resources.news_empty
 import yingdilite.feature.news.generated.resources.news_load_more_failed
 import yingdilite.feature.news.generated.resources.news_loading_more
@@ -52,6 +56,79 @@ internal fun NewsErrorState(
             Icon(AppIcon.Refresh.imageVector, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
             Text(stringResource(Res.string.news_retry))
+        }
+    }
+}
+
+/** 有旧 Banner 数据时的轻量失败提示：保留轮播，提供手动重试，不自动重试。 */
+@Composable
+internal fun BannerRefreshFailureNotice(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp, start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = AppIcon.Refresh.imageVector,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onRetry) {
+            Text(stringResource(Res.string.news_retry))
+        }
+    }
+}
+
+/** 有旧新闻数据时的刷新失败提示：常驻在列表上方，可重试或关闭。 */
+@Composable
+internal fun NewsRefreshFailureBar(
+    message: String,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = AppIcon.Refresh.imageVector,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onRetry) {
+                Text(stringResource(Res.string.news_retry))
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = AppIcon.Close.imageVector,
+                    contentDescription = stringResource(Res.string.news_dismiss),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

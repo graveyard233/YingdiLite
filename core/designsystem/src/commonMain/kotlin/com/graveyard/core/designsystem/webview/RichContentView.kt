@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.graveyard.core.designsystem.webview.platform.NativeWebView
 import com.graveyard.core.designsystem.webview.platform.WebNavigationDecision
 import com.graveyard.core.designsystem.webview.platform.WebNavigationRequest
@@ -51,11 +54,13 @@ fun RichContentView(
     onNavigation: (WebNavigationRequest) -> WebNavigationDecision = { WebNavigationDecision.Block },
     onEvent: (RichContentEvent) -> Unit = {},
     templateData: JsonObject = JsonObject(emptyMap()),
+    isVisible: Boolean = true,
 ) {
     val pool = LocalWebViewPool.current
     val callback by rememberUpdatedState(onEvent)
     val navigation by rememberUpdatedState(onNavigation)
     val uriHandler = LocalUriHandler.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val key = template.reuseKey
     var attempt by remember(key, contentKey) { mutableStateOf(0) }
     var failed by remember(key, contentKey) { mutableStateOf(false) }
@@ -85,6 +90,15 @@ fun RichContentView(
             RichContentDocument(contentKey, html, baseUrl, templateData),
             theme,
         )
+    }
+    DisposableEffect(lease, lifecycleOwner, isVisible) {
+        val runtime = lease?.entry as? TemplateRuntime
+        if (!isVisible) runtime?.captureReadingPosition()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) runtime?.captureReadingPosition()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     Box(modifier) {
         if (!failed) lease?.let { NativeWebView(it.entry.port, it.id, interaction, Modifier.fillMaxSize()) }

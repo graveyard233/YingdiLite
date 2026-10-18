@@ -12,7 +12,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -29,11 +28,9 @@ import com.graveyard.feature.news.viewmodel.NewsTagEditor
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.navigation.LocalNewsPresentation
 import com.graveyard.feature.news.viewmodel.NewsViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import yingdilite.feature.news.generated.resources.Res
@@ -42,7 +39,7 @@ import yingdilite.feature.news.generated.resources.news_tags_save_failed
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
-    onArticleClick: (String, String, NewsAuthor) -> Unit,
+    onArticleClick: (String, String, NewsAuthor, String, String) -> Unit,
     presentation: NewsPresentation = LocalNewsPresentation.current,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
@@ -75,16 +72,13 @@ fun NewsRouteScreen(
         initialPage = categoryIds.indexOf(activeTagId),
         pageCount = { categories.size },
     )
-    val scope = rememberCoroutineScope()
     val pagingItemsByTag = remember(viewModel) {
         mutableStateMapOf<Int, LazyPagingItems<NewsArticle>>()
     }
-    val refreshingTags by viewModel.refreshingTags.collectAsState()
     val currentPresentation by rememberUpdatedState(presentation)
     LaunchedEffect(presentation.interactive, presentation.listVisible) {
         if (!presentation.interactive || !presentation.listVisible) tagEditor.close()
     }
-    var messageJob by remember { mutableStateOf<Job?>(null) }
     var visitedTagIds by rememberSaveable { mutableStateOf(emptyList<Int>()) }
     var previousCategoryIds by rememberSaveable { mutableStateOf(categoryIds) }
     var pagerCategoryIds by remember { mutableStateOf(emptyList<Int>()) }
@@ -99,7 +93,6 @@ fun NewsRouteScreen(
             currentCategoryIds.getOrNull(pagerState.settledPage) == tagId
     }
     val onSelectTag: (Int) -> Unit = { tagId ->
-        messageJob?.cancel()
         isSynchronizingPager = true
         requestedTagId = tagId
         pagerNavigationRequest++
@@ -119,7 +112,6 @@ fun NewsRouteScreen(
         viewModel.updateCategories(categoryIds)
     }
     LaunchedEffect(activeTagId) {
-        messageJob?.cancel()
         visitedTagIds = (visitedTagIds + activeTagId).distinct()
     }
     LaunchedEffect(categoryIds, activeTagId, pagerNavigationRequest) {
@@ -155,11 +147,6 @@ fun NewsRouteScreen(
             if (viewModel.uiState.value.selectedTagId != tagId) viewModel.selectTag(tagId)
         }
     }
-    DisposableEffect(Unit) {
-        onDispose {
-            messageJob?.cancel()
-        }
-    }
 
     // Keep visited presenters alive so a refresh can finish after switching categories.
     val collectionPageIndices by remember(pagerState) {
@@ -190,20 +177,13 @@ fun NewsRouteScreen(
                 tagId = category.id,
                 viewModel = viewModel,
                 pagingItemsByTag = pagingItemsByTag,
-                isRefreshing = category.id in refreshingTags,
                 stateHolder = stateHolder,
                 isCurrentPage = isCurrentPage,
                 onPageVisited = { tagId ->
                     visitedTagIds = (visitedTagIds + tagId).distinct()
                 },
-                onShowRefreshFailure = { tagId, message ->
-                    messageJob?.cancel()
-                    messageJob = scope.launch {
-                        if (isCurrentPage(tagId)) showMessage(message)
-                    }
-                },
-                onArticleClick = { id, title, newsAuthor ->
-                    if (currentPresentation.interactive) onArticleClick(id, title, newsAuthor)
+                onArticleClick = { id, title, newsAuthor, replyNum, likeNum ->
+                    if (currentPresentation.interactive) onArticleClick(id, title, newsAuthor, replyNum, likeNum)
                 },
                 selectedArticleId = presentation.selectedArticleId,
             )

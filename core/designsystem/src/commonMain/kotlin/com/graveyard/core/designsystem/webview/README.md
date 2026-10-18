@@ -22,8 +22,10 @@ window.AppContentTemplate = {
 };
 ```
 
-`render` receives `{html, baseUrl, scrollY, theme, templateData}`. `templateData` is an optional
-template-owned JSON object for feature-specific data; the shared WebView layer does not interpret it.
+`render` receives `{html, baseUrl, scrollY, position, theme, templateData}`. `position` contains
+`{scrollY, anchor?: {path, marker, fraction}}`; `scrollY` remains available for simpler templates.
+`templateData` is an optional template-owned JSON object for feature-specific data;
+the shared WebView layer does not interpret it.
 `context.signal` aborts the old render on replacement
 or reset. Use it on event listeners and cancel timers, animation frames, observers and outstanding tasks
 on abort/reset. An async render must settle on cancellation. Reset must finish all cleanup before resolving.
@@ -31,9 +33,14 @@ Do not access the native bridge directly: keep the per-render `context` in event
 `context.emit(event, data)`. Its immutable identity prevents late events from acting on the next document.
 For async DOM changes also check `context.isCurrent()` after awaits.
 
-Events: `scroll` (`{y}`), `linkClick` (`{url}`), `imageClick` (`{urls, index}`),
+Events: `scroll` (`{position}`; legacy `{y}` also works), `linkClick` (`{url}`),
+`imageClick` (`{urls, index, position?}`),
 `templateMessage` (`{name, payload}`). Render completion, snapshots, reset acknowledgements and errors
-are sent by the shared bridge. `captureState` uses CSS pixels. Persist reading state in the route.
+are sent by the shared bridge. `captureState` returns the position object and uses CSS pixels.
+`RichContentReadingState` exports/restores versioned JSON and notifies its owner when positions change.
+Snapshots are isolated by template ID/revision/protocol and content key. Persist the compact string
+in an entry-scoped `SavedStateHandle`, not the HTML or WebView. `isVisible = false` and lifecycle
+pause/stop request supplemental checkpoints; normal scroll events are the primary source.
 
 Local templates retain their shell: handle links in the caller and return `Block`, or return
 `OpenExternal`. Use `WebPageView` when navigation should replace the displayed page.
@@ -65,8 +72,9 @@ and velocities to Compose pixels and restore temporary settings on release.
 The news screen has two independent loading stages: fetching the article body, then rendering it in a
 local template. It does not navigate the WebView directly to the remote article page.
 
-1. `ArticleRouteScreen` collects `ArticleViewModel.uiState` and owns a
-   `remember(articleId) { RichContentReadingState() }`, shared across detail layout changes.
+1. `ArticleRouteScreen` collects `ArticleViewModel.uiState` and uses its `readingState`.
+   The entry-scoped ViewModel restores this state from `SavedStateHandle` and synchronously
+   writes each changed JSON snapshot back to the handle, including across detail layout changes.
 2. `ArticleViewModel.loadArticle()` cancels the previous request, sets `isLoading = true`, validates the
    article ID, and calls `NewsRepository.getArticleContent()`.
 3. `YingdiNetData` fetches the mobile article HTML through Ktor. Ksoup extracts the inner HTML of
@@ -77,7 +85,7 @@ local template. It does not navigate the WebView directly to the remote article 
    loads `news_detail.html` with the shared `template_bridge.js` injected and waits for the JS `ready`
    event. A reused runtime keeps its already initialized shell and skips this step.
 6. `TemplateRuntime.update()` supplies the latest document, template data, and theme. Once ready, it
-   sends `render` with the body HTML, article base URL, saved CSS-pixel scroll offset, theme, and
+   sends `render` with the body HTML, article base URL, saved anchor/scroll position, theme, and
    `templateData.author`.
 7. The news template replaces the body, sets its base URL and theme, renders the optional
    `templateData.author` profile bar, promotes image `data-src` when needed, wraps tables for
@@ -86,8 +94,18 @@ local template. It does not navigate the WebView directly to the remote article 
 
 `rendered` means the template's render hook has completed, not that all images have loaded. Image
 load/error events and a `ResizeObserver` continue correcting the restored position as layout changes;
-user input stops this restoration. Scroll events update the route-owned reading state. This state is
-in memory, not persisted across process recreation.
+user input stops this restoration. Anchors identify reading blocks using deterministic child-index
+paths and content checksums, plus a fraction within the block. Window reflow uses the latest anchor;
+missing or changed blocks fall back to a clamped CSS-pixel offset. Scroll events are coalesced per
+frame. Image clicks send a position before navigation and in the click payload; hidden pages also
+send a checkpoint. Binding tokens and update generations reject stale asynchronous captures.
+
+The gallery remains a separate serializable navigation entry presented by `DialogSceneStrategy`.
+Its overlay keeps the article scene, layout constraints, lease, and DOM mounted. Closing it simply
+reveals the article without rendering or restoring the body again. Gallery pager state and article
+snapshots can survive system task restoration through entry saveable state. This is task state,
+not a long-term reading history; removing the task or force-stopping and cold-starting is outside
+the restoration guarantee.
 
 ### Loading flowchart
 
@@ -139,18 +157,18 @@ sequenceDiagram
         RT->>JS: loadHtml(local template with injected bridge)
         JS-->>RT: DOMContentLoaded: validate hooks, emit ready
     end
-    RT->>JS: render(html, baseUrl, scrollY, theme)
+    RT->>JS: render(html, baseUrl, position, theme)
     JS->>JS: Reset old body, insert content, restore position next frame
     JS-->>RT: rendered
     RT-->>UI: Rendered: loaded = true
-    JS-->>RT: scroll(y)
+    JS-->>RT: scroll(position)
     RT->>RT: Update route-owned reading state
     UI->>Pool: On disposal: release(lease)
     Pool->>RT: unbind()
     RT->>JS: captureState (if ready and healthy)
     RT->>RT: Clear binding and callbacks; detach native view
     Pool->>RT: recycle()
-    JS-->>RT: state(scrollY)
+    JS-->>RT: state(position)
     RT->>RT: Save snapshot if reading binding still owns the position
     RT->>JS: reset
     JS->>JS: Abort render, remove listeners, cancel frames, stop media, clear body
@@ -170,7 +188,7 @@ are never borrowed, and acquisition does not wait for cleanup. An incompatible i
 | `mode` | `template` | Local templates and ordinary pages are different modes. |
 | `configuration` | `templateBridge = true`, `javaScript = true`, `domStorage = false` | All native configuration fields must match. |
 | `templateId` | `news.detail` | Both articles must use the same template identity. |
-| `revision` | `2` | Bump when the template or its resource dependencies change. |
+| `revision` | `3` | Bump when the template or its resource dependencies change. |
 | `protocolVersion` | `1` | Host and template protocol versions must match. |
 | Template `baseUrl` | `https://mob.iyingdi.com/` | The template loading base URL must match. |
 

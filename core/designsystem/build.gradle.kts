@@ -68,13 +68,20 @@ kotlin {
                 implementation(libs.compose.animation)
                 api(libs.compose.material3)
                 api(libs.compose.ui)
+                api(libs.compose.uiToolingPreview)
                 api(libs.compose.components.resources)
 
 
                 api(libs.androidx.navigation3.ui)
                 api(libs.androidx.lifecycle.viewmodelNavigation3)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+                api(libs.zoomable)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
+
+                implementation(project.dependencies.platform(libs.coil.bom))
+                implementation(libs.coil.compose)
+                implementation(libs.coil.network.ktor)
             }
         }
 

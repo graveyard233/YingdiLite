@@ -1,6 +1,5 @@
 package com.graveyard.feature.news.viewmodel
 
-import com.graveyard.core.data.paging.NewsRefreshRequest
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.model.news.NewsBanner
 
@@ -13,11 +12,4 @@ data class BannerUiState(
     val items: List<NewsBanner> = emptyList(),
     val isLoading: Boolean = false,
     val error: DataError? = null,
-)
-
-internal data class NewsPagingRefreshState(
-    val request: NewsRefreshRequest? = null,
-    val isLoading: Boolean = false,
-    val error: DataError? = null,
-    val isCancelled: Boolean = false,
 )

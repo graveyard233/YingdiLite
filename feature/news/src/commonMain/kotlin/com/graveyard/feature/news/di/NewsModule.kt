@@ -12,6 +12,7 @@ val newsModule = module {
             repository = get(),
             articleId = parameters[0],
             articleTitle = parameters[1],
+            savedStateHandle = get(),
         )
     }
     viewModelOf(::NewsViewModel)

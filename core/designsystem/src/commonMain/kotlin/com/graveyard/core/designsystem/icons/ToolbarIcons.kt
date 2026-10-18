@@ -29,8 +29,17 @@ internal val notificationsIcon = toolbarIcon(
 
 internal val commentIcon = toolbarIcon(
     "Comment",
-    "M4,3h16a2,2 0,0 1,2,2v12a2,2 0,0 1,-2,2H6l-4,4V5a2,2 0,0 1,2,-2Z " +
-        "M4,5v13.17L5.17,17H20V5Z",
+    "M6,14H18V12H6v2Z M6,11H18V9H6v2Z M6,8H18V6H6v2Z " +
+        "M22,22L18,18H4Q3.18,18 2.59,17.41T2,16V4Q2,3.17 2.59,2.59T4,2H20q0.83,0 1.41,0.59T22,4V22Z " +
+        "M4,16H18.85L20,17.13V4H4V16Z m0,0V4V16Z",
+)
+
+internal val editIcon = toolbarIcon(
+    "Edit",
+    "M5,19H6.43L16.2,9.23L14.78,7.8L5,17.58V19Z " +
+        "M3,21V16.75L16.2,3.57Q16.5,3.3 16.86,3.15T17.63,3q0.4,0 0.78,0.15T19.05,3.6L20.43,5 " +
+        "q0.3,0.27 0.44,0.65T21,6.4q0,0.4 -0.14,0.76T20.43,7.82L7.25,21H3Z " +
+        "M19,6.4L17.6,5L19,6.4Z M15.48,8.52L14.78,7.8L16.2,9.23L15.48,8.52Z",
 )
 
 internal val imageIcon = toolbarIcon(
