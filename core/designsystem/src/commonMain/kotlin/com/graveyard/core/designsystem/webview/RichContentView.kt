@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,7 +49,13 @@ fun RichContentView(
     readingState: RichContentReadingState,
     modifier: Modifier = Modifier,
     theme: RichContentTheme = MaterialTheme.colorScheme.let {
-        RichContentTheme(it.surface.css(), it.onSurface.css(), it.primary.css(), it.surface.luminance() < 0.5f)
+        RichContentTheme(
+            background = it.surface.css(),
+            foreground = it.onSurface.css(),
+            link = it.primary.css(),
+            dark = it.surface.luminance() < 0.5f,
+            roles = it.toRoleColors(),
+        )
     },
     interaction: WebViewInteraction = WebViewInteraction.Native,
     onNavigation: (WebNavigationRequest) -> WebNavigationDecision = { WebNavigationDecision.Block },
@@ -110,3 +117,60 @@ fun RichContentView(
 }
 
 private fun Color.css(): String = "#" + (toArgb() and 0x00ffffff).toString(16).padStart(6, '0')
+
+/**
+ * Every Material role, keyed by `ColorScheme` property name. Templates use the exact palette
+ * instead of approximating containers with `color-mix`; keys are plain camelCase so the shell can
+ * turn them into `--md-sys-color-*` custom properties without a shared name table.
+ */
+private fun ColorScheme.toRoleColors(): Map<String, String> = buildMap(48) {
+    fun role(name: String, color: Color) { put(name, color.css()) }
+    role("primary", primary)
+    role("onPrimary", onPrimary)
+    role("primaryContainer", primaryContainer)
+    role("onPrimaryContainer", onPrimaryContainer)
+    role("inversePrimary", inversePrimary)
+    role("secondary", secondary)
+    role("onSecondary", onSecondary)
+    role("secondaryContainer", secondaryContainer)
+    role("onSecondaryContainer", onSecondaryContainer)
+    role("tertiary", tertiary)
+    role("onTertiary", onTertiary)
+    role("tertiaryContainer", tertiaryContainer)
+    role("onTertiaryContainer", onTertiaryContainer)
+    role("background", background)
+    role("onBackground", onBackground)
+    role("surface", surface)
+    role("onSurface", onSurface)
+    role("surfaceVariant", surfaceVariant)
+    role("onSurfaceVariant", onSurfaceVariant)
+    role("surfaceTint", surfaceTint)
+    role("inverseSurface", inverseSurface)
+    role("inverseOnSurface", inverseOnSurface)
+    role("error", error)
+    role("onError", onError)
+    role("errorContainer", errorContainer)
+    role("onErrorContainer", onErrorContainer)
+    role("outline", outline)
+    role("outlineVariant", outlineVariant)
+    role("scrim", scrim)
+    role("surfaceDim", surfaceDim)
+    role("surfaceBright", surfaceBright)
+    role("surfaceContainerLowest", surfaceContainerLowest)
+    role("surfaceContainerLow", surfaceContainerLow)
+    role("surfaceContainer", surfaceContainer)
+    role("surfaceContainerHigh", surfaceContainerHigh)
+    role("surfaceContainerHighest", surfaceContainerHighest)
+    role("primaryFixed", primaryFixed)
+    role("primaryFixedDim", primaryFixedDim)
+    role("onPrimaryFixed", onPrimaryFixed)
+    role("onPrimaryFixedVariant", onPrimaryFixedVariant)
+    role("secondaryFixed", secondaryFixed)
+    role("secondaryFixedDim", secondaryFixedDim)
+    role("onSecondaryFixed", onSecondaryFixed)
+    role("onSecondaryFixedVariant", onSecondaryFixedVariant)
+    role("tertiaryFixed", tertiaryFixed)
+    role("tertiaryFixedDim", tertiaryFixedDim)
+    role("onTertiaryFixed", onTertiaryFixed)
+    role("onTertiaryFixedVariant", onTertiaryFixedVariant)
+}

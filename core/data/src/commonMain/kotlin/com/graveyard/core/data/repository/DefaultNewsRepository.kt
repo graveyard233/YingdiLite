@@ -78,9 +78,16 @@ internal class DefaultNewsRepository(
     override suspend fun getArticleContent(postId: Long): DataResult<ArticleContent> {
         return try {
             require(postId > 0) { "postId must be positive" }
-            val html = remoteDataSource.getArticleContentHtml(postId)
+            val response = remoteDataSource.getArticleContentHtml(postId)
             currentCoroutineContext().ensureActive()
-            DataResult.Success(ArticleContent(postId, html, "https://mob.iyingdi.com/post/$postId"))
+            DataResult.Success(
+                ArticleContent(
+                    articleId = postId,
+                    html = response.html,
+                    baseUrl = "https://mob.iyingdi.com/post/$postId",
+                    newsAuthor = response.newsAuthor,
+                ),
+            )
         } catch (exception: CancellationException) {
             throw exception
         } catch (exception: Exception) {

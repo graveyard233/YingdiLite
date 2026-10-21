@@ -25,7 +25,6 @@ import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.viewmodel.ArticleUiState
 import com.graveyard.core.designsystem.webview.RichContentReadingState
-import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.coroutines.launch
 
 private const val DETAIL_PAGE = 0
@@ -35,13 +34,13 @@ private const val PAGE_COUNT = 2
 @Composable
 internal fun ArticlePaneHost(
     uiState: ArticleUiState,
-    newsAuthor: NewsAuthor,
     presentation: NewsPresentation,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
     readingState: RichContentReadingState,
     onRetry: () -> Unit,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
+    onCardOpen: (id: String, title: String) -> Unit = { _, _ -> },
     replyNum: String = "",
     likeNum: String = "",
     onWriteCommentClick: () -> Unit = {},
@@ -135,12 +134,12 @@ internal fun ArticlePaneHost(
                     pageState.SaveableStateProvider(DETAIL_PAGE) {
                         ArticleDetailPage(
                             uiState = uiState,
-                            newsAuthor = newsAuthor,
                             onBack = ::handleBack,
                             onMoreClicked = onMoreClicked,
                             readingState = readingState,
                             onRetry = onRetry,
                             onImageClick = onImageClick,
+                            onCardOpen = onCardOpen,
                             replyNum = replyNum,
                             likeNum = likeNum,
                             onWriteCommentClick = onWriteCommentClick,
@@ -177,13 +176,13 @@ internal fun ArticlePaneHost(
             when (page) {
                 DETAIL_PAGE -> ArticleDetailPage(
                     uiState = uiState,
-                    newsAuthor = newsAuthor,
                     onBack = ::handleBack,
                     onMoreClicked = onMoreClicked,
                     readingState = readingState,
                     contentVisible = presentation.interactive && pagerState.settledPage == DETAIL_PAGE,
                     onRetry = onRetry,
                     onImageClick = onImageClick,
+                    onCardOpen = onCardOpen,
                     replyNum = replyNum,
                     likeNum = likeNum,
                     onWriteCommentClick = onWriteCommentClick,

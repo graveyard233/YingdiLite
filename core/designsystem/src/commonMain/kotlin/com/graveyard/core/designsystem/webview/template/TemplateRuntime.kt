@@ -253,6 +253,7 @@ internal class TemplateRuntime(
         return withTimeoutOrNull(2_000) {
             snapshot?.await()
             snapshot = null
+            port.closeMediaPresentations()
             request("reset").await()
             !broken && !destroyed
         } ?: false
@@ -286,4 +287,8 @@ private fun themeJson(theme: RichContentTheme) = buildJsonObject {
     put("foreground", theme.foreground)
     put("link", theme.link)
     put("dark", theme.dark)
+    // Exact Material roles. Omitted when empty so older templates keep the derived palette.
+    if (theme.roles.isNotEmpty()) {
+        put("colors", buildJsonObject { theme.roles.forEach { (role, color) -> put(role, color) } })
+    }
 }

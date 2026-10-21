@@ -1,5 +1,6 @@
-package com.graveyard.feature.news.ui.articleDetail.screen
+package com.graveyard.feature.news.ui.articleDetail.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues

@@ -22,7 +22,6 @@ import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.ui.newsList.component.NewsTagEditorSheet
 import com.graveyard.feature.news.viewmodel.NewsTagEditor
 import com.graveyard.feature.news.navigation.NewsPresentation
@@ -39,7 +38,7 @@ import yingdilite.feature.news.generated.resources.news_tags_save_failed
 @Composable
 fun NewsRouteScreen(
     onShowMessage: suspend (String) -> Unit,
-    onArticleClick: (String, String, NewsAuthor, String, String) -> Unit,
+    onArticleClick: (String, String, String, String) -> Unit,
     presentation: NewsPresentation = LocalNewsPresentation.current,
     viewModel: NewsViewModel = koinViewModel(),
 ) {
@@ -182,8 +181,8 @@ fun NewsRouteScreen(
                 onPageVisited = { tagId ->
                     visitedTagIds = (visitedTagIds + tagId).distinct()
                 },
-                onArticleClick = { id, title, newsAuthor, replyNum, likeNum ->
-                    if (currentPresentation.interactive) onArticleClick(id, title, newsAuthor, replyNum, likeNum)
+                onArticleClick = { id, title, replyNum, likeNum ->
+                    if (currentPresentation.interactive) onArticleClick(id, title, replyNum, likeNum)
                 },
                 selectedArticleId = presentation.selectedArticleId,
             )

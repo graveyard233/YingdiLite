@@ -10,7 +10,21 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
-data class RichContentTheme(val background: String, val foreground: String, val link: String, val dark: Boolean)
+/**
+ * Palette handed to the local template.
+ *
+ * [background], [foreground], [link] and [dark] are the values the shell has always used and stay
+ * authoritative for the base tokens. [roles] carries the whole Material role set keyed by
+ * [androidx.compose.material3.ColorScheme] property name, so templates can paint exact M3 surfaces
+ * instead of deriving them with `color-mix`. An empty map means "derive the old way".
+ */
+data class RichContentTheme(
+    val background: String,
+    val foreground: String,
+    val link: String,
+    val dark: Boolean,
+    val roles: Map<String, String> = emptyMap(),
+)
 
 sealed interface RichContentEvent {
     data object Rendered : RichContentEvent

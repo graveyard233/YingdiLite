@@ -11,7 +11,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.graveyard.core.model.news.NewsArticle
-import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.viewmodel.BannerUiState
 import com.graveyard.feature.news.viewmodel.NewsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -25,7 +24,7 @@ internal fun NewsCategoryPage(
     stateHolder: SaveableStateHolder,
     isCurrentPage: (Int) -> Boolean,
     onPageVisited: (Int) -> Unit,
-    onArticleClick: (String, String, NewsAuthor, String, String) -> Unit,
+    onArticleClick: (String, String, String, String) -> Unit,
     selectedArticleId: String? = null,
 ) {
     val banners = remember(viewModel, tagId) {

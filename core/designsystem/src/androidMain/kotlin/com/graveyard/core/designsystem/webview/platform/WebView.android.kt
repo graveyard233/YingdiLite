@@ -22,10 +22,18 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollDispatcher
@@ -34,6 +42,10 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.graveyard.core.designsystem.media.MediaSystemBars
+import com.graveyard.core.designsystem.media.MediaSystemBarsVisibility
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -45,8 +57,14 @@ internal actual fun rememberWebViewFactory(): (WebViewConfiguration) -> WebViewP
 
 @Composable
 internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interaction: WebViewInteraction, modifier: Modifier) {
-    val view = (port as AndroidWebViewPort).view
+    val androidPort = port as AndroidWebViewPort
+    val view = androidPort.view
     val density = LocalDensity.current.density
+    DisposableEffect(androidPort, bindingId) {
+        val owner = Any()
+        androidPort.attachFullScreenHost(owner)
+        onDispose { androidPort.detachFullScreenHost(owner) }
+    }
     key(bindingId, interaction, density) {
         val dispatcher = remember { NestedScrollDispatcher() }
         val connection = remember { object : NestedScrollConnection {} }
@@ -67,6 +85,57 @@ internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interactio
                 container.removeAllViews()
             },
         )
+    }
+    androidPort.fullScreenContent?.let { content ->
+        key(content) {
+            WebViewFullScreenDialog(content, onDismiss = { androidPort.hideCustomView(content) })
+        }
+    }
+}
+
+private class WebViewFullScreenContent(
+    val view: View,
+    private val callback: WebChromeClient.CustomViewCallback,
+) {
+    private var finished = false
+
+    fun finish() {
+        if (finished) return
+        finished = true
+        (view.parent as? ViewGroup)?.removeView(view)
+        callback.onCustomViewHidden()
+    }
+}
+
+@Composable
+private fun WebViewFullScreenDialog(content: WebViewFullScreenContent, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        MediaSystemBars()
+        MediaSystemBarsVisibility(hidden = true)
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+            AndroidView(
+                factory = { context ->
+                    FrameLayout(context).apply {
+                        setBackgroundColor(Color.BLACK)
+                        keepScreenOn = true
+                        addView(content.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    }
+                },
+                modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                onRelease = { container ->
+                    container.keepScreenOn = false
+                    container.removeAllViews()
+                },
+            )
+        }
     }
 }
 
@@ -262,8 +331,11 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
     private var destroyed = false
     private var epoch = 0L
     private var navigation = 0L
+    private var fullScreenHost: Any? = null
+    var fullScreenContent by mutableStateOf<WebViewFullScreenContent?>(null)
+        private set
     private val popups = mutableSetOf<WebView>()
-    val view = ScrollableWebView(context).apply {
+    val view: ScrollableWebView = ScrollableWebView(context).apply {
         setBackgroundColor(Color.TRANSPARENT)
         settings.javaScriptEnabled = configuration.javaScript
         settings.domStorageEnabled = configuration.domStorage
@@ -273,6 +345,20 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
         isHorizontalScrollBarEnabled = !configuration.templateBridge
         if (configuration.templateBridge) addJavascriptInterface(Bridge(), "AppWebBridge")
         webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View, callback: WebChromeClient.CustomViewCallback) {
+                if (destroyed || fullScreenHost == null || !this@AndroidWebViewPort.view.isAttachedToWindow ||
+                    fullScreenContent != null || view.parent != null
+                ) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                fullScreenContent = WebViewFullScreenContent(view, callback)
+            }
+
+            override fun onHideCustomView() {
+                hideCustomView()
+            }
+
             override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
                 if (destroyed) return false
                 val popup = WebView(context)
@@ -310,6 +396,7 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             if (!current()) return
+            hideCustomView()
             mainUrl = url
             onLoad?.invoke(WebLoadEvent.Started(++navigation, url))
         }
@@ -322,17 +409,20 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (current() && request.isForMainFrame && (mainUrl == null || request.url.toString() == mainUrl)) {
+                hideCustomView()
                 onLoad?.invoke(WebLoadEvent.Failed(navigation, error.description.toString()))
             }
         }
 
         override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
             if (current() && request.isForMainFrame && (mainUrl == null || request.url.toString() == mainUrl)) {
+                hideCustomView()
                 onLoad?.invoke(WebLoadEvent.Failed(navigation, errorResponse.reasonPhrase ?: "HTTP error", errorResponse.statusCode))
             }
         }
 
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+            hideCustomView()
             if (!destroyed) onLoad?.invoke(WebLoadEvent.ProcessTerminated)
             return true
         }
@@ -346,7 +436,26 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
     }
 
     private fun begin() {
+        hideCustomView()
         view.webViewClient = Client(++epoch)
+    }
+
+    fun attachFullScreenHost(owner: Any) {
+        hideCustomView()
+        fullScreenHost = owner
+    }
+
+    fun detachFullScreenHost(owner: Any) {
+        if (fullScreenHost !== owner) return
+        fullScreenHost = null
+        hideCustomView()
+    }
+
+    fun hideCustomView(content: WebViewFullScreenContent? = fullScreenContent) {
+        if (content == null || fullScreenContent !== content) return
+        // Clear the request before invoking Chromium: its callback can re-enter onHideCustomView.
+        fullScreenContent = null
+        content.finish()
     }
 
     override fun loadHtml(html: String, baseUrl: String) {
@@ -359,16 +468,22 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
     override fun reload() { if (!destroyed) { begin(); view.reload() } }
     override fun goBack() { if (!destroyed && view.canGoBack()) { begin(); view.goBack() } }
     override fun goForward() { if (!destroyed && view.canGoForward()) { begin(); view.goForward() } }
-    override fun stopLoading() { if (!destroyed) { epoch++; view.stopLoading() } }
+    override fun stopLoading() { if (!destroyed) { hideCustomView(); epoch++; view.stopLoading() } }
     override fun evaluate(script: String) {
         if (!destroyed) runCatching { view.evaluateJavascript(script, null) }.onFailure {
             onLoad?.invoke(WebLoadEvent.Failed(navigation, "JavaScript evaluation failed"))
         }
     }
-    override fun detach() { (view.parent as? ViewGroup)?.removeView(view) }
+    override fun detach() {
+        fullScreenHost = null
+        hideCustomView()
+        (view.parent as? ViewGroup)?.removeView(view)
+    }
 
     override fun destroy() {
         if (destroyed) return
+        fullScreenHost = null
+        hideCustomView()
         destroyed = true
         view.stopLoading()
         onMessage = null

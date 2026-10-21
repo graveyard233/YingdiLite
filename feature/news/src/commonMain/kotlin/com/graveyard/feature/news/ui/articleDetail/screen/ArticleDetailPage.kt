@@ -42,17 +42,20 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.graveyard.core.designsystem.icons.AppIcon
+import com.graveyard.core.designsystem.platform.plainTextClipEntry
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.designsystem.webview.RichContentView
 import com.graveyard.core.designsystem.webview.platform.WebNavigationDecision
 import com.graveyard.core.designsystem.webview.platform.WebViewInteraction
+import com.graveyard.feature.news.ui.articleDetail.NEWS_CARD_MESSAGE
+import com.graveyard.feature.news.ui.articleDetail.NEWS_DECK_MESSAGE
 import com.graveyard.feature.news.ui.articleDetail.NewsDeckMessage
 import com.graveyard.feature.news.ui.articleDetail.NewsDetailTemplate
+import com.graveyard.feature.news.ui.articleDetail.asNewsCardOpen
 import com.graveyard.feature.news.ui.articleDetail.asNewsDeckMessage
-import com.graveyard.feature.news.ui.articleDetail.platform.plainTextClipEntry
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.webview.RichContentEvent
-import com.graveyard.core.model.news.NewsAuthor
+import com.graveyard.feature.news.ui.articleDetail.component.ArticleInteractionBar
 import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
 import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
 import com.graveyard.feature.news.viewmodel.ArticleUiState
@@ -72,13 +75,13 @@ import yingdilite.feature.news.generated.resources.news_load_failed
 @Composable
 internal fun ArticleDetailPage(
     uiState: ArticleUiState,
-    newsAuthor: NewsAuthor,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
     readingState: RichContentReadingState,
     onRetry: () -> Unit,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
     onDeckLinkClick: (type: String?, game: String?, id: String?) -> Unit = { _, _, _ -> },
+    onCardOpen: (id: String, title: String) -> Unit = { _, _ -> },
     closeSelection: Boolean = false,
     onCommentsClick: (() -> Unit)? = null,
     contentVisible: Boolean = true,
@@ -213,6 +216,7 @@ internal fun ArticleDetailPage(
                     readingState = readingState,
                     isVisible = contentVisible,
                     templateData = buildJsonObject {
+                        val newsAuthor = uiState.newsAuthor
                         put("author", buildJsonObject {
                             put("id", newsAuthor.id)
                             put("username", newsAuthor.username)
@@ -232,7 +236,13 @@ internal fun ArticleDetailPage(
                     onEvent = { event ->
                         when (event) {
                             is RichContentEvent.ImageClick -> onImageClick(event.urls, event.index)
-                            is RichContentEvent.TemplateMessage -> event.asNewsDeckMessage()?.let(::onDeckMessage)
+                            is RichContentEvent.TemplateMessage -> {
+                                when (event.name) {
+                                    NEWS_DECK_MESSAGE -> event.asNewsDeckMessage()?.let(::onDeckMessage)
+                                    NEWS_CARD_MESSAGE -> event.asNewsCardOpen()?.let { onCardOpen(it.id, it.title) }
+                                    else -> Unit
+                                }
+                            }
                             else -> Unit
                         }
                     }

@@ -7,6 +7,7 @@ import com.graveyard.core.data.repository.NewsRepository
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.designsystem.webview.RichContentReadingState
+import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -46,8 +47,18 @@ class ArticleViewModel(
             currentCoroutineContext().ensureActive()
             mutableUiState.update {
                 when (result) {
-                    is DataResult.Success -> it.copy(content = result.data, isLoading = false, error = null)
-                    is DataResult.Failure -> it.copy(content = null, isLoading = false, error = result.error)
+                    is DataResult.Success -> it.copy(
+                        content = result.data,
+                        newsAuthor = result.data.newsAuthor,
+                        isLoading = false,
+                        error = null,
+                    )
+                    is DataResult.Failure -> it.copy(
+                        content = null,
+                        newsAuthor = NewsAuthor(),
+                        isLoading = false,
+                        error = result.error,
+                    )
                 }
             }
         }

@@ -10,10 +10,10 @@ data class NewsAuthor(
     val head: String = "",
     val credits: Long = 0L,
     val badgeJson: String = "",
-) {
+    // HTML can supply a level without credits; 0 means the level is unavailable.
     @Transient
-    val level: Int = calculateUserLevel(credits)
-}
+    val level: Int = calculateUserLevel(credits),
+)
 
 // Preserve the source table's duplicate final threshold.
 private val USER_LEVEL_THRESHOLDS = longArrayOf(

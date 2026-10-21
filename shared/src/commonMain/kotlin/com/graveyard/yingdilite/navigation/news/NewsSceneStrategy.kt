@@ -73,16 +73,20 @@ internal data class NewsScene(
     val articleEntry: NavEntry<NavKey>?,
     override val previousEntries: List<NavEntry<NavKey>>,
 ) : Scene<NavKey> {
-    // A wide reading workspace remains stable when the selected article changes.
+    private val selected = articleEntry?.metadata?.get(APP_ROUTE_KEY) as? ArticleRoute
+
+    // Feed selections share a workspace; linked pushes need distinct scenes for NavDisplay transitions.
+    // Layout changes preserve scene identity across window resizing and pane changes.
     override val key: Any = when (layout.mode) {
         NewsLayoutMode.Feed -> "news-feed"
-        else -> NEWS_READING_WORKSPACE_KEY
+        else -> selected?.instanceId?.takeIf { it.isNotBlank() }
+            ?.let { NEWS_READING_WORKSPACE_KEY to it }
+            ?: NEWS_READING_WORKSPACE_KEY
     }
     override val entries = buildList {
         if (layout.list != null) add(feedEntry)
         articleEntry?.let(::add)
     }
-    private val selected = articleEntry?.metadata?.get(APP_ROUTE_KEY) as? ArticleRoute
     private val presentation = AppScenePresentation(
         layout.mode, layout.showsNavigation,
         entries.mapNotNull { it.metadata[APP_ROUTE_KEY] as? NavKey }.toSet(),

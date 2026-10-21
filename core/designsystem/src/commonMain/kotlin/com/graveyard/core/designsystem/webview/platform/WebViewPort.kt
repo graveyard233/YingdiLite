@@ -42,6 +42,8 @@ internal interface WebViewPort {
     fun goForward()
     fun stopLoading()
     fun detach()
+    /** Finish native media dismissal before a pooled template can be reused. */
+    suspend fun closeMediaPresentations() {}
     fun destroy()
 }
 

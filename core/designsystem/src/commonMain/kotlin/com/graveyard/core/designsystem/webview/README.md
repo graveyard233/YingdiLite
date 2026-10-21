@@ -26,6 +26,9 @@ window.AppContentTemplate = {
 `{scrollY, anchor?: {path, marker, fraction}}`; `scrollY` remains available for simpler templates.
 `templateData` is an optional template-owned JSON object for feature-specific data;
 the shared WebView layer does not interpret it.
+`theme` carries `{background, foreground, link, dark}` plus, when supplied, `colors`: the whole
+Material role set keyed by `ColorScheme` property name (`surfaceContainerLow`, `onSurfaceVariant`, …).
+Treat `colors` as optional — derive the base tokens from the four legacy keys when it is absent.
 `context.signal` aborts the old render on replacement
 or reset. Use it on event listeners and cancel timers, animation frames, observers and outstanding tasks
 on abort/reset. An async render must settle on cancellation. Reset must finish all cleanup before resolving.
@@ -66,6 +69,17 @@ release cancel the shared fling. Horizontal gestures, taps, long presses and mul
 Independent HTML scroll regions and iframes do not gain nested-scroll support. Programmatic scrolling
 and reading-position restoration do not drive parents. Platform adapters convert native coordinates
 and velocities to Compose pixels and restore temporary settings on release.
+
+Embedded video fullscreen stays with the existing player. Android handles `WebChromeClient` custom
+views in an immersive, full-window Compose dialog; the player exit action or system Back closes it
+without reloading the article. The dialog keeps the screen awake and uses the device's current
+orientation. Releasing the host, detaching the WebView, loading a new document, or losing the renderer
+closes the custom view and completes its callback once. iOS enables WebKit element fullscreen and
+inline playback, leaving presentation to the system. Its scroll delegate survives WebKit temporarily
+reparenting the WebView, and detaching closes media presentations. Iframes must allow fullscreen;
+the remote player and platform WebView must also support the requested fullscreen mode. Template
+recycling waits for native media dismissal within its existing cleanup timeout before resetting
+the document, so a pending presentation cannot follow the WebView into its next lease.
 
 ## News detail loading flow
 

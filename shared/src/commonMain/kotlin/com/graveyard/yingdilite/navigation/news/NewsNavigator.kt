@@ -2,16 +2,15 @@ package com.graveyard.yingdilite.navigation.news
 
 import androidx.navigation3.runtime.NavKey
 import com.graveyard.core.designsystem.navigation.Navigator
-import com.graveyard.core.model.news.NewsAuthor
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.yingdilite.navigation.ImageGalleryRoute
+import kotlin.uuid.Uuid
 
 /** Extension in the assembly layer avoids a core:designsystem -> feature:news dependency. */
 internal fun Navigator.selectArticle(
     articleId: String,
     articleTitle: String,
-    newsAuthor: NewsAuthor = NewsAuthor(),
     replyNum: String = "",
     likeNum: String = "",
 ) {
@@ -21,9 +20,26 @@ internal fun Navigator.selectArticle(
         ArticleRoute(
             articleId = articleId,
             articleTitle = articleTitle,
-            newsAuthor = newsAuthor,
             replyNum = replyNum,
             likeNum = likeNum,
+        ),
+    )
+}
+
+/** Pushes an article opened from a card, preserving the source article in the back stack. */
+internal fun Navigator.openLinkedArticle(
+    articleId: String,
+    articleTitle: String,
+) {
+    if (state.currentTopLevelKey != NewsRoute) return
+    val current = state.currentKey as? ArticleRoute ?: return
+    if (current.articleId == articleId) return
+
+    state.currentSubStack.add(
+        ArticleRoute(
+            articleId = articleId,
+            articleTitle = articleTitle,
+            instanceId = Uuid.random().toString(),
         ),
     )
 }

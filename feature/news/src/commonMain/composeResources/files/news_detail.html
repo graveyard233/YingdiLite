@@ -12,6 +12,7 @@
       --foreground: #202124;
       --link: #176b55;
       --surface-container-low: #f1f4f9;
+      --surface-container-high: #e5e8ee;
       --on-surface-variant: #414750;
       --outline-variant: #c1c7d2;
       --outline: #727780;
@@ -28,6 +29,7 @@
         --foreground: #e8e8e8;
         --link: #8fd9bc;
         --surface-container-low: #242424;
+        --surface-container-high: #2f2f2f;
         --on-surface-variant: #c7c7c7;
         --outline-variant: #4a4a4a;
         --outline: #8e9094;
@@ -203,6 +205,426 @@
       margin: 1em 0;
       padding-left: 16px;
       border-left: 3px solid var(--link);
+    }
+
+    /* Media cards use the host palette directly, with aliases for older hosts. */
+    .yingdi-video,
+    .yingdi-card.steam {
+      display: block;
+      min-width: 0;
+      margin: 1.25em 0;
+      overflow: hidden;
+      border-radius: 16px;
+      background: var(--surface-container-low);
+      color: var(--foreground);
+    }
+
+    .yingdi-video .video-frame {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background: var(--surface-container-high);
+    }
+
+    .yingdi-video .video-frame > iframe,
+    .yingdi-video .video-frame > video {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 0;
+      border: 0;
+      object-fit: contain;
+    }
+
+    .yingdi-video .video-frame > [hidden],
+    .yingdi-video .video-caption [hidden] {
+      display: none;
+    }
+
+    .yingdi-video .video-caption {
+      padding: 14px 16px 16px;
+      background: var(--md-sys-color-primary-container, var(--avatar-background));
+      color: var(--md-sys-color-on-primary-container, var(--avatar-foreground));
+    }
+
+    .yingdi-video .video-source {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 28px;
+      font-size: 12px;
+      line-height: 20px;
+    }
+
+    .yingdi-video .video-source-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 44px;
+      width: 44px;
+      height: 44px;
+      margin: -8px -8px -8px 0;
+      border-radius: 50%;
+      color: inherit;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .yingdi-video .video-source-link svg,
+    .yingdi-card.steam .wish svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      fill: currentColor;
+    }
+
+    .yingdi-video .video-title {
+      margin: 8px 0 0;
+      font-size: 16px;
+      font-weight: 500;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .yingdi-video .video-fallback {
+      max-width: 100%;
+      padding: 16px;
+      color: var(--on-surface-variant);
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    .yingdi-video .video-fallback-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      margin-top: 8px;
+      padding: 0 16px;
+      border-radius: 24px;
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .yingdi-card.steam .card-thumbnail {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      aspect-ratio: 460 / 215;
+      overflow: hidden;
+      background: var(--surface-container-high);
+    }
+
+    #content .yingdi-card.steam .card-thumbnail img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      border-radius: 0;
+      object-fit: contain;
+    }
+
+    #content .yingdi-card.steam .card-thumbnail img[hidden],
+    .yingdi-card.steam .card-thumbnail-placeholder[hidden] {
+      display: none;
+    }
+
+    .yingdi-card.steam .card-thumbnail-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      color: var(--on-surface-variant);
+    }
+
+    .yingdi-card.steam .card-thumbnail-placeholder svg {
+      width: 32px;
+      height: 32px;
+      fill: currentColor;
+    }
+
+    .yingdi-card.steam .steam-platform {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: var(--md-sys-color-tertiary-container, var(--secondary-container));
+      color: var(--md-sys-color-on-tertiary-container, var(--on-secondary-container));
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 20px;
+    }
+
+    .yingdi-card.steam .card-info {
+      min-width: 0;
+      padding: 16px;
+    }
+
+    .yingdi-card.steam .title {
+      display: block;
+      margin: 0 0 12px;
+      color: var(--foreground);
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .yingdi-card.steam .card-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .yingdi-card.steam .price {
+      min-width: 0;
+      color: var(--on-surface-variant);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .yingdi-card.steam .wish {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      max-width: 100%;
+      margin-left: auto;
+      padding: 8px 18px;
+      border-radius: 24px;
+      background: var(--primary);
+      color: var(--md-sys-color-on-primary, var(--background));
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 20px;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .yingdi-card.steam .wish[aria-disabled="true"] {
+      background: var(--surface-container-high);
+      color: var(--on-surface-variant);
+    }
+
+    .yingdi-video a:focus-visible,
+    .yingdi-card.steam .wish:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .yingdi-video .video-source-link:focus-visible {
+      outline-color: currentColor;
+      outline-offset: -4px;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .yingdi-video .video-source-link:hover,
+      .yingdi-video .video-fallback-link:hover {
+        background: color-mix(in srgb, currentColor 8%, transparent);
+      }
+
+      .yingdi-card.steam a.wish:hover {
+        background: color-mix(in srgb, var(--md-sys-color-on-primary, var(--background)) 8%, var(--primary));
+      }
+    }
+
+    .yingdi-video .video-source-link:active,
+    .yingdi-video .video-fallback-link:active {
+      background: color-mix(in srgb, currentColor 12%, transparent);
+    }
+
+    .yingdi-card.steam a.wish:active {
+      background: color-mix(in srgb, var(--md-sys-color-on-primary, var(--background)) 12%, var(--primary));
+    }
+
+    /* Article link card: M3 filled card (16dp radius, surface-container-low, elevation 0). */
+    .yingdi-card.bbspost {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 1.25em 0;
+      padding: 12px;
+      border-radius: 16px;
+      background: var(--surface-container-low);
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 150ms ease;
+    }
+
+    /* A card without a title cannot carry an accessible name; showing a bare thumbnail would be
+       an unlabelled tap target, so it is dropped instead. */
+    .yingdi-card.bbspost.no-title {
+      display: none;
+    }
+
+    .yingdi-card.bbspost[role="link"] {
+      cursor: pointer;
+    }
+
+    .yingdi-card.bbspost .card-thumbnail {
+      display: block;
+      flex: 0 0 96px;
+      width: 96px;
+      height: 72px;
+      overflow: hidden;
+      border-radius: 12px;
+      background: var(--surface-container-high);
+    }
+
+    /* Both selectors are needed: the article's global rule sets max-width/height with !important. */
+    #content .yingdi-card.bbspost .card-thumbnail img {
+      display: block;
+      width: 96px !important;
+      height: 72px !important;
+      max-width: none !important;
+      max-height: none !important;
+      margin: 0 !important;
+      border-radius: 0;
+      object-fit: cover;
+    }
+
+    /* `hidden` must beat the sized rule above, which carries an id for specificity. */
+    #content .yingdi-card.bbspost .card-thumbnail img[hidden] {
+      display: none;
+    }
+
+    .yingdi-card.bbspost .card-thumbnail-placeholder[hidden] {
+      display: none;
+    }
+
+    .yingdi-card.bbspost .card-thumbnail-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      color: color-mix(in srgb, var(--on-surface-variant) 50%, transparent);
+    }
+
+    .yingdi-card.bbspost .card-thumbnail-placeholder svg {
+      width: 28px;
+      height: 28px;
+      fill: currentColor;
+    }
+
+    .yingdi-card.bbspost .card-info {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .yingdi-card.bbspost .card-info .title {
+      display: -webkit-box;
+      overflow: hidden;
+      color: var(--foreground);
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 22px;
+      overflow-wrap: anywhere;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .yingdi-card.bbspost .card-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      color: var(--on-surface-variant);
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 16px;
+    }
+
+    .yingdi-card.bbspost .card-status .author {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .yingdi-card.bbspost .card-status .time {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+
+    /* The separator only exists when both halves are present, so a lone author or timestamp
+       never trails a dot. */
+    .yingdi-card.bbspost .card-status .author:not([hidden]) + .time:not([hidden])::before {
+      content: "·";
+      margin-right: 6px;
+      color: color-mix(in srgb, var(--foreground) 38%, transparent);
+    }
+
+    .yingdi-card.bbspost .card-status .author[hidden],
+    .yingdi-card.bbspost .card-status .time[hidden] {
+      display: none;
+    }
+
+    .yingdi-card.bbspost:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* Hover only where a pointer can actually hover: on touch, :hover sticks after a tap. */
+    @media (hover: hover) and (pointer: fine) {
+      .yingdi-card.bbspost:hover {
+        background: color-mix(in srgb, var(--foreground) 8%, var(--surface-container-low));
+      }
+    }
+
+    .yingdi-card.bbspost:active {
+      background: color-mix(in srgb, var(--foreground) 12%, var(--surface-container-low));
+    }
+
+    @media (max-width: 360px) {
+      .yingdi-card.bbspost {
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .yingdi-card.bbspost .card-thumbnail {
+        flex-basis: 80px;
+        width: 80px;
+        height: 60px;
+      }
+
+      #content .yingdi-card.bbspost .card-thumbnail img {
+        width: 80px !important;
+        height: 60px !important;
+      }
+    }
+
+    /* A tapped card keeps :focus on touch, which would repaint the hover state layer. */
+    @media (hover: none) {
+      .yingdi-card.bbspost:focus:not(:active) {
+        background: var(--surface-container-low);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .yingdi-card.bbspost {
+        transition: none;
+      }
     }
 
     /* Deck card: M3 filled card (16dp radius, surface-container-low, elevation 0). */
@@ -393,37 +815,66 @@
       let renderFrame = 0;
       let authorGeneration = 0;
 
+      // Material role names arrive as camelCase keys; CSS custom properties use kebab-case.
+      const kebab = (name) => name.replace(/[A-Z]/g, (letter) => '-' + letter.toLowerCase());
+
+      // Role properties written by the previous theme, so a palette change never leaves stale
+      // colours behind on the root element.
+      let roleProperties = [];
+
       const updateTheme = (theme) => {
         const root = document.documentElement;
         root.style.setProperty('--background', theme.background);
         root.style.setProperty('--foreground', theme.foreground);
         root.style.setProperty('--link', theme.link);
+
+        // Publish the whole palette first so any rule (including future ones) can use the exact
+        // M3 role. Older hosts send no `colors`; then every alias below falls back to color-mix.
+        const roles = theme.colors && typeof theme.colors === 'object' ? theme.colors : {};
+        roleProperties.forEach((property) => root.style.removeProperty(property));
+        roleProperties = [];
+        for (const [name, value] of Object.entries(roles)) {
+          if (typeof value !== 'string' || !value) continue;
+          const property = `--md-sys-color-${kebab(name)}`;
+          root.style.setProperty(property, value);
+          roleProperties.push(property);
+        }
+        const role = (name, fallback) =>
+          typeof roles[name] === 'string' && roles[name] ? roles[name] : fallback;
+
         root.style.setProperty(
           '--surface-container-low',
-          `color-mix(in srgb, ${theme.background} 92%, ${theme.foreground})`
+          role('surfaceContainerLow', `color-mix(in srgb, ${theme.background} 92%, ${theme.foreground})`)
+        );
+        root.style.setProperty(
+          '--surface-container-high',
+          role('surfaceContainerHigh', `color-mix(in srgb, ${theme.background} 88%, ${theme.foreground})`)
         );
         root.style.setProperty(
           '--on-surface-variant',
-          `color-mix(in srgb, ${theme.foreground} 72%, ${theme.background})`
+          role('onSurfaceVariant', `color-mix(in srgb, ${theme.foreground} 72%, ${theme.background})`)
         );
         root.style.setProperty(
           '--outline-variant',
-          `color-mix(in srgb, ${theme.foreground} 24%, transparent)`
+          role('outlineVariant', `color-mix(in srgb, ${theme.foreground} 24%, transparent)`)
         );
         root.style.setProperty(
           '--avatar-background',
-          `color-mix(in srgb, ${theme.link} 18%, ${theme.background})`
+          role('primaryContainer', `color-mix(in srgb, ${theme.link} 18%, ${theme.background})`)
         );
-        root.style.setProperty('--avatar-foreground', theme.link);
-        root.style.setProperty('--primary', theme.link);
-        root.style.setProperty('--outline', `color-mix(in srgb, ${theme.foreground} 50%, ${theme.background})`);
+        root.style.setProperty('--avatar-foreground', role('onPrimaryContainer', theme.link));
+        root.style.setProperty('--primary', role('primary', theme.link));
+        root.style.setProperty(
+          '--outline',
+          role('outline', `color-mix(in srgb, ${theme.foreground} 50%, ${theme.background})`)
+        );
         root.style.setProperty(
           '--secondary-container',
-          `color-mix(in srgb, ${theme.link} 16%, ${theme.background})`
+          role('secondaryContainer', `color-mix(in srgb, ${theme.link} 16%, ${theme.background})`)
         );
         root.style.setProperty(
           '--on-secondary-container',
-          `color-mix(in srgb, ${theme.link} 70%, ${theme.foreground})`
+          role('onSecondaryContainer', `color-mix(in srgb, ${theme.link} 70%, ${theme.foreground})`)
         );
         root.style.colorScheme = theme.dark ? 'dark' : 'light';
       };
@@ -587,11 +1038,15 @@
         ].join(' '),
         // arrow_forward
         link: 'M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z',
+        // Material Symbols image; matches AppIcon.Image used by the native thumbnail placeholder.
+        image:
+          'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2Z ' +
+          'M5 5v14h14V5Z M6 17l4 -5 3 3 2 -3 3 5Z M8.5 6.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0 -3Z',
       };
 
-      // Deck images are presentation for the card and must not join the article gallery.
+      // Card thumbnails are decoration for the card and must not join the article gallery.
       const articleImages = () => [...content.querySelectorAll('img')].filter(
-        (img) => !img.closest('.yingdi-deck')
+        (img) => !img.closest('.yingdi-deck, .yingdi-card.bbspost, .yingdi-card.steam, .yingdi-video')
       );
 
       const createIcon = (name) => {
@@ -730,6 +1185,319 @@
         return true;
       };
 
+      const prepareVideos = (context) => {
+        content.querySelectorAll('.yingdi-video').forEach((card) => {
+          if (card.dataset.appVideo === 'true') return;
+          card.dataset.appVideo = 'true';
+          card.removeAttribute('contenteditable');
+
+          const media = card.querySelector('iframe, video');
+          let frame = media?.parentElement;
+          if (!frame || frame === card) {
+            frame = document.createElement('div');
+            if (media) {
+              media.before(frame);
+              frame.append(media);
+            } else {
+              card.prepend(frame);
+            }
+          }
+          frame.classList.add('video-frame');
+
+          let title = card.querySelector('.video-title');
+          if (!title) {
+            title = document.createElement('div');
+            title.className = 'video-title';
+          }
+          const titleText = (title.textContent || '').trim();
+          title.hidden = !titleText;
+
+          const source = media?.getAttribute('src') || media?.querySelector('source[src]')?.getAttribute('src');
+          let mediaUrl = null;
+          if (isSafeImageUrl(source)) mediaUrl = new URL(source, document.baseURI);
+          let destination = mediaUrl?.href || '';
+          let provider = '嵌入视频';
+          if (mediaUrl && (mediaUrl.hostname === 'bilibili.com' || mediaUrl.hostname.endsWith('.bilibili.com'))) {
+            provider = '哔哩哔哩';
+            const bvid = mediaUrl.searchParams.get('bvid') || '';
+            const aid = mediaUrl.searchParams.get('aid') || '';
+            if (/^BV[A-Za-z0-9]{10}$/.test(bvid)) {
+              destination = `https://www.bilibili.com/video/${bvid}`;
+            } else if (/^\d{1,20}$/.test(aid)) {
+              destination = `https://www.bilibili.com/video/av${aid}`;
+            }
+            const part = mediaUrl.searchParams.get('p') || '';
+            if (/^\d{1,6}$/.test(part)) {
+              const watchUrl = new URL(destination);
+              watchUrl.searchParams.set('p', part);
+              destination = watchUrl.href;
+            }
+          }
+
+          const caption = document.createElement('div');
+          caption.className = 'video-caption';
+          const sourceRow = document.createElement('div');
+          sourceRow.className = 'video-source';
+          const sourceLabel = document.createElement('span');
+          sourceLabel.textContent = provider;
+          sourceRow.append(sourceLabel);
+          if (destination) {
+            const link = document.createElement('a');
+            link.className = 'video-source-link';
+            link.href = destination;
+            link.setAttribute('aria-label', provider === '嵌入视频' ? '打开原视频' : `在${provider}打开视频`);
+            link.append(createIcon('link'));
+            sourceRow.append(link);
+          }
+          caption.append(sourceRow, title);
+          card.append(caption);
+
+          const fallback = document.createElement('div');
+          fallback.className = 'video-fallback';
+          fallback.setAttribute('role', 'status');
+          const message = document.createElement('div');
+          message.textContent = '视频暂时无法加载';
+          fallback.append(message);
+          if (destination) {
+            const link = document.createElement('a');
+            link.className = 'video-fallback-link';
+            link.href = destination;
+            link.textContent = provider === '嵌入视频' ? '打开原视频' : `在${provider}观看`;
+            fallback.append(link);
+          }
+          frame.append(fallback);
+          const showFailure = () => {
+            if (media) media.hidden = true;
+            fallback.hidden = false;
+          };
+          fallback.hidden = Boolean(mediaUrl);
+          if (media) {
+            media.removeAttribute('onerror');
+            if (media.tagName === 'IFRAME') {
+              media.title = titleText || '嵌入视频';
+              media.setAttribute('allowfullscreen', '');
+            } else {
+              media.controls = true;
+            }
+            // The source link stays available even when an embedded player cannot report failures.
+            media.addEventListener('error', showFailure, { signal: context.signal });
+            if (!mediaUrl) {
+              media.removeAttribute('src');
+              showFailure();
+            }
+          }
+        });
+      };
+
+      const prepareSteamCards = (context) => {
+        content.querySelectorAll('.yingdi-card.steam').forEach((card) => {
+          if (card.dataset.appSteam === 'true') return;
+          card.dataset.appSteam = 'true';
+          card.removeAttribute('contenteditable');
+
+          let cover = card.querySelector('.card-thumbnail');
+          if (!cover) {
+            cover = document.createElement('div');
+            cover.className = 'card-thumbnail';
+            card.prepend(cover);
+          }
+          const image = cover.querySelector('img');
+          const placeholder = document.createElement('span');
+          placeholder.className = 'card-thumbnail-placeholder';
+          placeholder.setAttribute('aria-hidden', 'true');
+          placeholder.append(createIcon('image'));
+          const platform = document.createElement('span');
+          platform.className = 'steam-platform';
+          platform.textContent = 'Steam';
+          cover.append(placeholder, platform);
+
+          const showPlaceholder = () => {
+            if (image) image.hidden = true;
+            placeholder.hidden = false;
+          };
+          const showImage = () => {
+            if (image) image.hidden = false;
+            placeholder.hidden = true;
+          };
+          if (image) {
+            const source = image.dataset.original || image.dataset.src || image.getAttribute('src');
+            image.removeAttribute('onerror');
+            image.alt = '';
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            if (isSafeImageUrl(source)) {
+              image.addEventListener('error', showPlaceholder, { signal: context.signal });
+              image.addEventListener('load', showImage, { signal: context.signal });
+              image.setAttribute('src', source);
+              showImage();
+              if (image.complete && image.naturalWidth === 0) showPlaceholder();
+            } else {
+              image.removeAttribute('src');
+              showPlaceholder();
+            }
+          } else {
+            showPlaceholder();
+          }
+
+          let info = card.querySelector('.card-info');
+          if (!info) {
+            info = document.createElement('div');
+            info.className = 'card-info';
+            card.append(info);
+          }
+          let title = info.querySelector('.title');
+          if (!title) {
+            title = document.createElement('span');
+            title.className = 'title';
+            info.prepend(title);
+          }
+          const titleText = (title.textContent || '').trim() || 'Steam 游戏';
+          title.textContent = titleText;
+
+          let status = info.querySelector('.card-status');
+          if (!status) {
+            status = document.createElement('div');
+            status.className = 'card-status';
+            info.append(status);
+          }
+          let price = status.querySelector('.price');
+          if (!price) {
+            price = document.createElement('span');
+            price.className = 'price';
+            status.prepend(price);
+          }
+          if (!(price.textContent || '').trim()) price.textContent = '暂无报价';
+
+          const id = (card.getAttribute('data-id') || '').trim();
+          const navigable = /^\d{1,20}$/.test(id) && /[1-9]/.test(id);
+          const wish = document.createElement(navigable ? 'a' : 'span');
+          wish.className = 'wish';
+          wish.textContent = '添加愿望单';
+          wish.append(createIcon('link'));
+          if (navigable) {
+            wish.href = `https://store.steampowered.com/app/${id}/`;
+            wish.setAttribute('aria-label', `${titleText}，添加愿望单，在 Steam 中打开`);
+          } else {
+            wish.setAttribute('aria-disabled', 'true');
+          }
+          const previousWish = status.querySelector('.wish');
+          if (previousWish) previousWish.replaceWith(wish);
+          else status.append(wish);
+        });
+      };
+
+      // Prepare only .yingdi-card.bbspost nodes while preserving the source div.
+      const prepareCards = () => {
+        content.querySelectorAll('.yingdi-card.bbspost').forEach((card) => {
+          if (card.dataset.appCard === 'true') return;
+          card.dataset.appCard = 'true';
+          const id = (card.getAttribute('data-id') || '').trim();
+          const navigable = /^\d{1,20}$/.test(id);
+          const titleElement = card.querySelector('.card-info .title') || card.querySelector('.title');
+          const authorElement = card.querySelector('.card-status .author');
+          const timeElement = card.querySelector('.card-status .time');
+          const title = (titleElement?.textContent || '').replace(/\s+/g, ' ').trim();
+          const author = (authorElement?.textContent || '').replace(/\s+/g, ' ').trim();
+          const time = (timeElement?.textContent || '').replace(/\s+/g, ' ').trim();
+
+          // Without a title the card has no accessible name, and a bare thumbnail is an unlabelled
+          // tap target, so the whole card is dropped.
+          if (!title) card.classList.add('no-title');
+          if (authorElement && !author) authorElement.hidden = true;
+          if (timeElement && !time) timeElement.hidden = true;
+
+          if (navigable && title) {
+            card.setAttribute('role', 'link');
+            card.tabIndex = 0;
+            card.setAttribute('aria-label', [title, author, time, '打开文章'].join('，'));
+          } else {
+            card.removeAttribute('role');
+            card.removeAttribute('tabindex');
+            card.removeAttribute('aria-label');
+          }
+
+          let cover = card.querySelector('.card-thumbnail');
+          if (!cover) {
+            cover = document.createElement('div');
+            cover.className = 'card-thumbnail';
+            card.prepend(cover);
+          }
+
+          const image = cover.querySelector('img');
+          let placeholder = cover.querySelector('.card-thumbnail-placeholder');
+          if (!placeholder) {
+            placeholder = document.createElement('span');
+            placeholder.className = 'card-thumbnail-placeholder';
+            placeholder.setAttribute('aria-hidden', 'true');
+            placeholder.append(createIcon('image'));
+            cover.append(placeholder);
+          }
+
+          const showPlaceholder = () => {
+            if (image) image.hidden = true;
+            placeholder.hidden = false;
+          };
+          const showImage = () => {
+            if (image) image.hidden = false;
+            placeholder.hidden = true;
+          };
+
+          if (!image) {
+            showPlaceholder();
+            return;
+          }
+
+          // Author inline handlers are not trusted; local listeners handle the failure state.
+          const source = image.dataset.original || image.dataset.src || image.getAttribute('src');
+          image.removeAttribute('onerror');
+          image.setAttribute('alt', '');
+          image.setAttribute('loading', 'lazy');
+          image.setAttribute('decoding', 'async');
+
+          if (!isSafeImageUrl(source)) {
+            image.removeAttribute('src');
+            showPlaceholder();
+            return;
+          }
+
+          image.setAttribute('src', source);
+          showImage();
+          image.addEventListener('error', showPlaceholder);
+          image.addEventListener('load', showImage);
+          // The thumbnail may already be decoded from the previous DOM; no event will follow.
+          if (image.complete && image.naturalWidth === 0) showPlaceholder();
+        });
+      };
+
+      // Card taps are handled before images: tapping a card must never open the gallery.
+      const handleCardClick = (event, target, context) => {
+        const card = target?.closest('.yingdi-card.bbspost[data-app-card="true"]');
+        if (!card) return false;
+        event.preventDefault();
+        // A long-press selection inside the card wins: the reader is selecting, not navigating.
+        const selection = window.getSelection?.();
+        if (selection && !selection.isCollapsed && String(selection).trim() &&
+          selection.anchorNode && card.contains(selection.anchorNode)) return true;
+
+        const id = (card.getAttribute('data-id') || '').trim();
+        if (!/^\d{1,20}$/.test(id)) return true;
+        const type = (card.getAttribute('data-typee') || '').trim();
+        const title = (card.querySelector('.card-info .title')?.textContent || '').trim().slice(0, 200);
+        const author = (card.querySelector('.card-status .author')?.textContent || '').trim().slice(0, 64);
+
+        if (type === '13') {
+          // In-app push: the host opens the article on top of the current reading scene.
+          context.emit('templateMessage', {
+            name: 'newsCard', payload: { action: 'open', id, type, title, author },
+          });
+        } else {
+          // No in-app screen is known for this card type; fall back to the existing link path so
+          // the tap is never a dead end.
+          context.emit('linkClick', { url: `https://mob.iyingdi.com/post/${id}` });
+        }
+        return true;
+      };
+
       const clearAuthor = () => {
         authorGeneration++;
         authorBar.hidden = true;
@@ -827,13 +1595,14 @@
         const target = event.target instanceof Element ? event.target : event.target.parentElement;
 
         if (handleDeckClick(event, target, context)) return;
+        if (handleCardClick(event, target, context)) return;
 
         const image = target?.closest('img');
         if (image) {
           event.preventDefault();
           const images = articleImages();
           const index = images.indexOf(image);
-          // Deck covers are card decoration and never open the gallery.
+          // Deck and card covers are decoration; they never open the gallery.
           if (index < 0) return;
           const urls = images.map(
             (img) => new URL(img.dataset.original || img.dataset.src || img.currentSrc || img.src, document.baseURI).href
@@ -864,6 +1633,13 @@
         }
       };
 
+      const handleKeydown = (event, context) => {
+        if (event.key !== 'Enter') return;
+        const target = event.target instanceof Element ? event.target : event.target.parentElement;
+        const card = target?.closest('.yingdi-card.bbspost[role="link"][data-app-card="true"]');
+        if (card) handleCardClick(event, card, context);
+      };
+
       window.AppContentTemplate = {
         updateTheme,
         captureState: readPosition,
@@ -886,6 +1662,9 @@
           });
 
           prepareDecks();
+          prepareCards();
+          prepareVideos(context);
+          prepareSteamCards(context);
 
           content.querySelectorAll('table').forEach((table) => {
             const wrapper = document.createElement('div');
@@ -918,6 +1697,9 @@
           );
 
           content.addEventListener('click', (event) => handleClick(event, context), {
+            signal: context.signal,
+          });
+          content.addEventListener('keydown', (event) => handleKeydown(event, context), {
             signal: context.signal,
           });
 

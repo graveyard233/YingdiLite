@@ -75,6 +75,7 @@ import com.graveyard.yingdilite.navigation.news.PaneBounds
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
 import com.graveyard.yingdilite.navigation.news.openImages
+import com.graveyard.yingdilite.navigation.news.openLinkedArticle
 import com.graveyard.yingdilite.navigation.news.scenePresentation
 import com.graveyard.yingdilite.navigation.news.selectArticle
 import kotlinx.serialization.modules.SerializersModule
@@ -157,7 +158,11 @@ fun AppNavigation(
         } else emptyMap()
         NavEntry(
             key = key,
-            contentKey = if (key is ImageGalleryRoute) "image-gallery:${key.instanceId}" else key.toString(),
+            contentKey = when (key) {
+                is ImageGalleryRoute -> "image-gallery:${key.instanceId}"
+                is ArticleRoute -> "article:${key.instanceId.ifBlank { key.articleId }}"
+                else -> key.toString()
+            },
             metadata = galleryMetadata + mapOf(
                 APP_NAVIGATION_SCENE_KEY to key.hasAppNavigation(),
                 APP_ROUTE_KEY to key,
@@ -314,20 +319,24 @@ private fun AppNavEntry(
     when (key) {
         NewsRoute -> NewsRouteScreen(
             onShowMessage = onShowMessage,
-            onArticleClick = { articleId, articleTitle, newsAuthor, replyNum, likeNum ->
-                navigator.selectArticle(articleId, articleTitle, newsAuthor, replyNum, likeNum)
+            onArticleClick = { articleId, articleTitle, replyNum, likeNum ->
+                navigator.selectArticle(articleId, articleTitle, replyNum, likeNum)
             },
         )
         is ArticleRoute -> {
             ArticleRouteScreen(
                 articleId = key.articleId,
                 articleTitle = key.articleTitle,
-                newsAuthor = key.newsAuthor,
                 replyNum = key.replyNum,
                 likeNum = key.likeNum,
                 onBack = { if (navigator.state.currentKey == key) navigator.goBack() },
                 onImageClick = { urls, index ->
                     if (navigator.state.currentKey == key) navigator.openImages(urls, index)
+                },
+                onCardOpen = { id, title ->
+                    // Cards inside an article push another article on top of the reading scene, so
+                    // back returns to the article that linked here.
+                    if (navigator.state.currentKey == key) navigator.openLinkedArticle(id, title)
                 },
             )
         }

@@ -20,6 +20,7 @@ import kotlinx.cinterop.ObjCAction
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.useContents
+import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.CoreGraphics.CGPoint
 import platform.CoreGraphics.CGPointMake
 import platform.CoreGraphics.CGRectMake
@@ -57,6 +58,7 @@ import platform.WebKit.WKWebViewConfiguration
 import platform.WebKit.WKWindowFeatures
 import platform.WebKit.javaScriptEnabled
 import platform.darwin.NSObject
+import kotlin.coroutines.resume
 import kotlin.math.abs
 
 @Composable
@@ -66,7 +68,8 @@ internal actual fun rememberWebViewFactory(): (WebViewConfiguration) -> WebViewP
 
 @Composable
 internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interaction: WebViewInteraction, modifier: Modifier) {
-    val view = (port as IosWebViewPort).view
+    val iosPort = port as IosWebViewPort
+    val view = iosPort.view
     val density = LocalDensity.current.density
     key(bindingId, interaction, density) {
         val dispatcher = remember { NestedScrollDispatcher() }
@@ -75,7 +78,10 @@ internal actual fun NativeWebView(port: WebViewPort, bindingId: Long, interactio
         val decay = rememberSplineBasedDecay<Float>()
         val coordinator = remember(dispatcher, scope, decay) { WebViewScrollCoordinator(dispatcher, scope, decay) }
         UIKitView(
-            factory = { IosWebViewContainer(view, coordinator, density, interaction) },
+            factory = {
+                iosPort.attach()
+                IosWebViewContainer(view, coordinator, density, interaction)
+            },
             modifier = if (interaction == WebViewInteraction.NestedScroll) modifier.nestedScroll(
                 connection = connection,
                 dispatcher = dispatcher,
@@ -97,6 +103,7 @@ private class IosWebViewContainer(
     private val scrollCoordinator: IosScrollCoordinator?
 
     init {
+        (content.superview as? IosWebViewContainer)?.dispose()
         content.removeFromSuperview()
         scrollCoordinator = if (interaction == WebViewInteraction.NestedScroll) {
             IosScrollCoordinator(content.scrollView, coordinator, density)
@@ -113,7 +120,7 @@ private class IosWebViewContainer(
 
     override fun layoutSubviews() {
         super.layoutSubviews()
-        content.setFrame(bounds)
+        if (content.superview === this) content.setFrame(bounds)
     }
 
     fun dispose() {
@@ -130,7 +137,12 @@ private class IosWebViewContainer(
     }
 
     override fun willRemoveSubview(subview: UIView) {
-        if (subview === content) dispose()
+        // WebKit temporarily reparents this view for element fullscreen, then returns it here.
+        // Keep the scroll delegate alive until UIKitView's onRelease disposes the container.
+        if (subview === content) {
+            coordinator.cancel()
+            scrollCoordinator?.cancelGesture()
+        }
         super.willRemoveSubview(subview)
     }
 }
@@ -379,6 +391,7 @@ private class IosWebViewPort(private val configuration: WebViewConfiguration) : 
     override var onLoad: ((WebLoadEvent) -> Unit)? = null
     override var onNavigation: ((WebNavigationRequest) -> WebNavigationDecision)? = null
     private var destroyed = false
+    private var detached = true
     private var initialAction = false
     private var navigationId = 0L
     private var activeNavigation: WKNavigation? = null
@@ -452,6 +465,8 @@ private class IosWebViewPort(private val configuration: WebViewConfiguration) : 
     }
     val view = WKWebView(CGRectMake(0.0, 0.0, 0.0, 0.0), WKWebViewConfiguration().apply {
         preferences.javaScriptEnabled = configuration.javaScript
+        preferences.elementFullscreenEnabled = true
+        allowsInlineMediaPlayback = true
         if (configuration.templateBridge) userContentController.addScriptMessageHandler(messages, "appWeb")
     }).apply {
         opaque = false
@@ -470,6 +485,7 @@ private class IosWebViewPort(private val configuration: WebViewConfiguration) : 
 
     private fun begin(url: String?, action: () -> WKNavigation?) {
         if (destroyed) return
+        view.closeAllMediaPresentationsWithCompletionHandler(null)
         initialAction = true
         val id = ++navigationId
         activeNavigation = null
@@ -496,7 +512,27 @@ private class IosWebViewPort(private val configuration: WebViewConfiguration) : 
         }
     }
 
-    override fun detach() { view.removeFromSuperview() }
+    fun attach() {
+        detached = false
+    }
+
+    override fun detach() {
+        detached = true
+        view.closeAllMediaPresentationsWithCompletionHandler {
+            // WebKit may return its fullscreen view to the old container during dismissal.
+            if (detached) view.removeFromSuperview()
+        }
+        view.removeFromSuperview()
+    }
+
+    override suspend fun closeMediaPresentations() {
+        suspendCancellableCoroutine<Unit> { continuation ->
+            view.closeAllMediaPresentationsWithCompletionHandler {
+                if (detached) view.removeFromSuperview()
+                if (continuation.isActive) continuation.resume(Unit)
+            }
+        }
+    }
 
     override fun destroy() {
         if (destroyed) return
