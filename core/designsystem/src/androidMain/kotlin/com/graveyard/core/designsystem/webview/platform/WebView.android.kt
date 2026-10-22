@@ -295,6 +295,13 @@ private class WebViewScrollContainer(
         }
     }
 
+    fun stopScroll() {
+        coordinator.cancel()
+        touching = false
+        contentY = null
+        webView.flingScroll(0, 0)
+    }
+
     private fun dispose() {
         coordinator.cancel()
         velocityTracker?.recycle()
@@ -473,6 +480,11 @@ private class AndroidWebViewPort(context: Context, configuration: WebViewConfigu
         if (!destroyed) runCatching { view.evaluateJavascript(script, null) }.onFailure {
             onLoad?.invoke(WebLoadEvent.Failed(navigation, "JavaScript evaluation failed"))
         }
+    }
+    override fun stopScroll() {
+        if (destroyed) return
+        val container = view.parent as? WebViewScrollContainer
+        if (container != null) container.stopScroll() else view.flingScroll(0, 0)
     }
     override fun detach() {
         fullScreenHost = null

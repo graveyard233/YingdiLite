@@ -45,6 +45,12 @@ Snapshots are isolated by template ID/revision/protocol and content key. Persist
 in an entry-scoped `SavedStateHandle`, not the HTML or WebView. `isVisible = false` and lifecycle
 pause/stop request supplemental checkpoints; normal scroll events are the primary source.
 
+Pass a remembered `RichContentController` to `RichContentView` to call `scrollToTop()` on the visible
+mounted view. The template may implement an optional `scrollToTop()` hook to clear its restore target,
+scroll the document, and report the new reading position. The runtime stops native/Compose inertia
+before dispatching this command; calls after unmount do nothing. Programmatic scrolling does not drive
+Compose parents, so callers should expand app bars themselves when returning to the top.
+
 Local templates retain their shell: handle links in the caller and return `Block`, or return
 `OpenExternal`. Use `WebPageView` when navigation should replace the displayed page.
 Only application-controlled local templates get the native message bridge; content fragments are

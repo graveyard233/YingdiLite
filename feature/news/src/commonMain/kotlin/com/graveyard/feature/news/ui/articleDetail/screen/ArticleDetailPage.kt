@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.designsystem.platform.plainTextClipEntry
+import com.graveyard.core.designsystem.webview.RichContentController
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.designsystem.webview.RichContentView
 import com.graveyard.core.designsystem.webview.platform.WebNavigationDecision
@@ -92,6 +93,7 @@ internal fun ArticleDetailPage(
     onFavoriteClick: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val contentController = remember(uiState.articleId) { RichContentController() }
     val showToolbar = !uiState.isLoading && uiState.error == null && uiState.content != null
     val toolbarState = rememberArticleBottomAppBarState(
         articleId = uiState.articleId,
@@ -177,6 +179,13 @@ internal fun ArticleDetailPage(
                         onWriteCommentClick = onWriteCommentClick,
                         onFireClick = onFireClick,
                         onFavoriteClick = onFavoriteClick,
+                        onToTopClick = {
+                            contentController.scrollToTop()
+                            scrollBehavior.state.heightOffset = 0f
+                            scrollBehavior.state.contentOffset = 0f
+                            toolbarState.heightOffset = 0f
+                            toolbarState.contentOffset = 0f
+                        },
                         scrollBehavior = toolbarScrollBehavior,
                         modifier = if (toolbarInteractive) Modifier else Modifier.clearAndSetSemantics {},
                     )
@@ -214,6 +223,7 @@ internal fun ArticleDetailPage(
                     html = uiState.content.html,
                     baseUrl = uiState.content.baseUrl,
                     readingState = readingState,
+                    controller = contentController,
                     isVisible = contentVisible,
                     templateData = buildJsonObject {
                         val newsAuthor = uiState.newsAuthor

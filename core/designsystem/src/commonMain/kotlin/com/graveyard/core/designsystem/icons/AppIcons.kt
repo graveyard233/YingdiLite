@@ -32,8 +32,11 @@ enum class AppIcon(val imageVector: ImageVector) {
     Sync(sync),
     ArrowBack(arrowBack),
     MoreVert(moreVert),
+    ThumbDown(thumbDownIcon),
     Download(download),
     Favorite(favorite),
     Fire(fire),
     FireFill(fireFill),
+    ToTop(toTop),
+    Reply(reply),
 }

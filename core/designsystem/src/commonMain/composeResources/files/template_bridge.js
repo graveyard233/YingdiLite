@@ -19,6 +19,7 @@
         active?.controller.abort();
         const controller = new AbortController();
         context = {
+          identity: message,
           controller,
           signal: controller.signal,
           isCurrent: () => active === context && !controller.signal.aborted,
@@ -38,6 +39,11 @@
               break;
             case 'updateTheme':
               if (bound?.isCurrent()) await renderer.updateTheme(message.payload);
+              break;
+            case 'scrollToTop':
+              if (bound?.isCurrent() && ['lease', 'version', 'contentKey'].every(
+                key => message[key] === bound.identity[key]
+              )) await renderer.scrollToTop?.();
               break;
             case 'captureState':
               send(message, 'state', await renderer.captureState());

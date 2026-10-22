@@ -27,10 +27,12 @@ internal interface YingdiData {
     suspend fun getUserInfo(userId: Long): UserInfoResponse
 
     /**
-     * 评论列表（游标分页）。[lastCommentId] 首页传 `0`，之后必须原样回传服务端给的上一个游标；
-     * 切换 `order` 或 `voteFaction` 时重置为 `0`。
+     * 评论列表（游标分页）。首页 [lastCommentId] 传 `0`；后续游标必须取上次响应
+     * `normal_comments` 列表末项的 `main_comment.comment.id`，不能从热评、回复或重排后的列表推导。
+     * 切换 `order` 或 `voteFaction` 时重置为 `0`。首屏包含完整热评；后续响应的热评字段是占位数据，
+     * 调用方应忽略。`hot_num` 和 `normal_num` 是各自列表的总量。
      *
-     * @param order 只接受 `hot` 或 `time`。
+     * @param order `hot` 为综合排序，`created` 为按创建时间排序。
      */
     suspend fun getArticleCommentList(
         postId: Long,

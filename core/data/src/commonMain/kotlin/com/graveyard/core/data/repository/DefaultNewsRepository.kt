@@ -7,9 +7,11 @@ import com.graveyard.core.data.local.preferences.requireValidTagInfos
 import com.graveyard.core.data.mapper.toNewsBanner
 import com.graveyard.core.data.mapper.toTagInfo
 import com.graveyard.core.data.network.YingdiData
+import com.graveyard.core.data.paging.ArticleCommentsPagingSource
 import com.graveyard.core.data.paging.NewsPagingSource
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.data.result.toDataException
+import com.graveyard.core.model.news.ArticleCommentOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
 import com.graveyard.core.model.news.TagInfo
@@ -18,6 +20,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.withContext
 
 internal class DefaultNewsRepository(
@@ -94,6 +100,49 @@ internal class DefaultNewsRepository(
             currentCoroutineContext().ensureActive()
             DataResult.Failure(exception.toDataException().error)
         }
+    }
+
+    override fun getArticleComments(
+        postId: Long,
+        order: ArticleCommentOrder,
+        pageSize: Int,
+    ): ArticleCommentsFeed {
+        require(pageSize > 0) { "pageSize must be greater than zero" }
+
+        val state = MutableStateFlow(ArticleCommentsFeedState())
+        val comments = Pager(
+            config = PagingConfig(
+                pageSize = pageSize,
+                initialLoadSize = pageSize,
+                enablePlaceholders = false,
+                prefetchDistance = 10,
+            ),
+            initialKey = 0L,
+            pagingSourceFactory = {
+                val generation = state.updateAndGet { current ->
+                    current.copy(
+                        generation = current.generation + 1,
+                    )
+                }.generation
+                ArticleCommentsPagingSource(
+                    remoteDataSource = remoteDataSource,
+                    postId = postId,
+                    order = order,
+                    pageSize = pageSize,
+                    onFirstPageLoaded = { metadata ->
+                        // A refresh must keep the previous first page until its replacement succeeds.
+                        state.update { current ->
+                            if (current.generation == generation) current.copy(metadata = metadata) else current
+                        }
+                    },
+                )
+            },
+        ).flow
+
+        return ArticleCommentsFeed(
+            comments = comments,
+            state = state.asStateFlow(),
+        )
     }
 
 }

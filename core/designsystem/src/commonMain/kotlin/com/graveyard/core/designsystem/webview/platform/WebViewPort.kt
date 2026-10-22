@@ -37,6 +37,7 @@ internal interface WebViewPort {
     fun loadHtml(html: String, baseUrl: String)
     fun loadUrl(url: String)
     fun evaluate(script: String)
+    fun stopScroll()
     fun reload()
     fun goBack()
     fun goForward()

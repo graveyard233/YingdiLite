@@ -11,5 +11,5 @@ data class ArticleUiState(
     val newsAuthor: NewsAuthor = NewsAuthor(),
     val isLoading: Boolean = true,
     val error: DataError? = null,
-    val commentsPlaceholder: String = "评论区内容占位",
+    val commentsError: DataError? = null,
 )

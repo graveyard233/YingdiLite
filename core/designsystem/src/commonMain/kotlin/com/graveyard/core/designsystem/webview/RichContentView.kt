@@ -62,6 +62,7 @@ fun RichContentView(
     onEvent: (RichContentEvent) -> Unit = {},
     templateData: JsonObject = JsonObject(emptyMap()),
     isVisible: Boolean = true,
+    controller: RichContentController? = null,
 ) {
     val pool = LocalWebViewPool.current
     val callback by rememberUpdatedState(onEvent)
@@ -97,6 +98,14 @@ fun RichContentView(
             RichContentDocument(contentKey, html, baseUrl, templateData),
             theme,
         )
+    }
+    DisposableEffect(lease, controller, isVisible) {
+        val runtime = (lease?.entry as? TemplateRuntime)?.takeIf { isVisible }
+        val command = runtime?.let { { it.scrollToTop() } }
+        controller?.scrollToTopCommand = command
+        onDispose {
+            if (controller?.scrollToTopCommand === command) controller?.scrollToTopCommand = null
+        }
     }
     DisposableEffect(lease, lifecycleOwner, isVisible) {
         val runtime = lease?.entry as? TemplateRuntime

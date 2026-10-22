@@ -162,6 +162,14 @@ internal class TemplateRuntime(
         return result
     }
 
+    fun scrollToTop() {
+        if (leaseId == 0L || !ready.isCompleted || broken || destroyed || document == null) return
+        port.stopScroll()
+        // Invalidate any checkpoint captured before the explicit navigation to the top.
+        reading?.update(buildJsonObject { put("scrollY", 0.0) })
+        send("scrollToTop")
+    }
+
     fun captureReadingPosition() {
         if (leaseId == 0L || !ready.isCompleted || broken || destroyed || document == null || checkpoint?.isActive == true) return
         val result = request("captureState", reading)

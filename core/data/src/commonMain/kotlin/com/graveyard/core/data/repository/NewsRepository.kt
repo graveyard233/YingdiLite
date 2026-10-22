@@ -2,6 +2,7 @@ package com.graveyard.core.data.repository
 
 import androidx.paging.PagingData
 import com.graveyard.core.data.result.DataResult
+import com.graveyard.core.model.news.ArticleCommentOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
 import com.graveyard.core.model.news.TagInfo
@@ -23,4 +24,11 @@ interface NewsRepository {
     suspend fun refreshTagInfos(): DataResult<List<TagInfo>>
 
     suspend fun getArticleContent(postId: Long): DataResult<ArticleContent>
+
+    /** Returns one paging session for an article's comments and the selected ordering. */
+    fun getArticleComments(
+        postId: Long,
+        order: ArticleCommentOrder,
+        pageSize: Int = 20,
+    ): ArticleCommentsFeed
 }

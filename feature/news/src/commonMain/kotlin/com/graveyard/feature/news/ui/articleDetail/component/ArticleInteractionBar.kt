@@ -1,6 +1,5 @@
 package com.graveyard.feature.news.ui.articleDetail.component
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,13 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.BottomAppBarScrollBehavior
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FlexibleBottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,10 +41,11 @@ import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.article_favorite
 import yingdilite.feature.news.generated.resources.article_fire_count
-import yingdilite.feature.news.generated.resources.article_write_comment
+import yingdilite.feature.news.generated.resources.article_comments_write_short
+import yingdilite.feature.news.generated.resources.article_to_top
 import yingdilite.feature.news.generated.resources.news_comments
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ArticleInteractionBar(
     replyNum: String,
@@ -54,15 +55,18 @@ internal fun ArticleInteractionBar(
     onWriteCommentClick: () -> Unit,
     onFireClick: () -> Unit,
     onFavoriteClick: () -> Unit,
+    onToTopClick: () -> Unit,
     scrollBehavior: BottomAppBarScrollBehavior,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
     val replies = replyNum.ifEmpty { "0" }
     val likes = likeNum.ifEmpty { "0" }
-    val writeCommentLabel = stringResource(Res.string.article_write_comment)
-    BottomAppBar(
+    FlexibleBottomAppBar(
         modifier = modifier,
+        // Set the expanded height without constraining the collapsing layout.
+        expandedHeight = 56.dp,
+        horizontalArrangement = Arrangement.Start,
         contentPadding = PaddingValues(0.dp),
         windowInsets = WindowInsets(0, 0, 0, 0),
         scrollBehavior = scrollBehavior,
@@ -71,56 +75,50 @@ internal fun ArticleInteractionBar(
             val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.3f
             val gutter = if (compact) 8.dp else 16.dp
             val gap = if (compact) 0.dp else 4.dp
-            val actionWidth = ((maxWidth - gutter * 2 - 96.dp - gap * 3) / 2)
+            val actionWidth = ((maxWidth - gutter * 2 - 144.dp - gap * 3 - 8.dp) / 2)
                 .coerceIn(48.dp, 80.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = gutter),
-                horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilledTonalButton(
-                    onClick = onWriteCommentClick,
-                    enabled = enabled,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .semantics { contentDescription = writeCommentLabel },
-                    contentPadding = PaddingValues(
-                        horizontal = if (compact) 8.dp else 12.dp,
-                        vertical = 8.dp,
-                    ),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(AppIcon.Edit.imageVector, null, Modifier.size(24.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = writeCommentLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).clearAndSetSemantics {},
-                    )
+                    IconButton(onClick = onToTopClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+                        Icon(AppIcon.ToTop.imageVector, stringResource(Res.string.article_to_top))
+                    }
+                    IconButton(onClick = onWriteCommentClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+                        Icon(AppIcon.Edit.imageVector, stringResource(Res.string.article_comments_write_short))
+                    }
                 }
-                CountAction(
-                    icon = AppIcon.Comment,
-                    count = replies,
-                    label = stringResource(Res.string.news_comments, replies),
-                    maxWidth = actionWidth,
-                    enabled = enabled,
-                    onClick = onCommentsClick,
-                )
-                CountAction(
-                    icon = AppIcon.Fire,
-                    count = likes,
-                    label = stringResource(Res.string.article_fire_count, likes),
-                    maxWidth = actionWidth,
-                    enabled = enabled,
-                    onClick = onFireClick,
-                    tint = colors.error,
-                )
-                IconButton(onClick = onFavoriteClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
-                    Icon(AppIcon.Favorite.imageVector, stringResource(Res.string.article_favorite))
+                Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CountAction(
+                        icon = AppIcon.Comment,
+                        count = replies,
+                        label = stringResource(Res.string.news_comments, replies),
+                        maxWidth = actionWidth,
+                        enabled = enabled,
+                        onClick = onCommentsClick,
+                    )
+                    CountAction(
+                        icon = AppIcon.Fire,
+                        count = likes,
+                        label = stringResource(Res.string.article_fire_count, likes),
+                        maxWidth = actionWidth,
+                        enabled = enabled,
+                        onClick = onFireClick,
+                        tint = colors.error,
+                    )
+                    IconButton(onClick = onFavoriteClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+                        Icon(AppIcon.Favorite.imageVector, stringResource(Res.string.article_favorite))
+                    }
                 }
             }
         }
@@ -135,8 +133,9 @@ private fun CountAction(
     maxWidth: Dp,
     enabled: Boolean,
     onClick: (() -> Unit)?,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    tint: Color = LocalContentColor.current,
 ) {
+    val iconColors = IconButtonDefaults.iconButtonColors(contentColor = tint)
     val actionModifier = Modifier
         .widthIn(min = 48.dp, max = maxWidth)
         .heightIn(min = 48.dp)
@@ -146,7 +145,10 @@ private fun CountAction(
             onClick = onClick,
             enabled = enabled,
             modifier = actionModifier,
-            colors = ButtonDefaults.textButtonColors(contentColor = tint),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = iconColors.contentColor,
+                disabledContentColor = iconColors.disabledContentColor,
+            ),
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
         ) {
             CountActionContent(icon, count)
@@ -157,7 +159,7 @@ private fun CountAction(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CountActionContent(icon, count, tint)
+            CountActionContent(icon, count, if (enabled) iconColors.contentColor else iconColors.disabledContentColor)
         }
     }
 }

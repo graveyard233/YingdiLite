@@ -25,8 +25,12 @@ fun ArticleRouteScreen(
     viewModel: ArticleViewModel = koinViewModel { parametersOf(articleId, articleTitle) },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val commentsState by viewModel.commentsState.collectAsStateWithLifecycle()
     ArticlePaneHost(
         uiState = uiState,
+        commentsFeed = commentsState.feed,
+        commentsMetadata = commentsState.metadata,
+        commentOrder = commentsState.order,
         replyNum = replyNum,
         likeNum = likeNum,
         presentation = presentation,
@@ -36,6 +40,11 @@ fun ArticleRouteScreen(
         onRetry = viewModel::loadArticle,
         onImageClick = onImageClick,
         onCardOpen = onCardOpen,
+        onLoadComments = viewModel::loadComments,
+        onCommentOrderSelected = viewModel::selectCommentOrder,
+        onCommentLikeClicked = viewModel::onCommentLikeClicked,
+        onCommentDislikeClicked = viewModel::onCommentDislikeClicked,
+        onCommentMoreClicked = viewModel::onCommentMoreClicked,
         onWriteCommentClick = onWriteCommentClick,
         onFireClick = onFireClick,
         onFavoriteClick = onFavoriteClick,

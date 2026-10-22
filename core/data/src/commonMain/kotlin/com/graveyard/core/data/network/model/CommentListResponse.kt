@@ -17,8 +17,12 @@ import kotlinx.serialization.Serializable
  * ```
  *
  * 说明：
+ * - 支持 `created` 按评论创建时间排序。
+ * - 首页返回完整热评；后续页的 hot_comments 是占位字段，调用方必须忽略，不能覆盖首页热评。
+ * - 普通评论下一页游标来自响应 normal_comments 末项的 main_comment.comment.id，必须在映射、去重或展示处理前读取。
  * - 响应被拆成「热门」和「普通」两个列表，`hot_num` / `normal_num`
  *   是**总条数**（用于分页判断），不一定等于对应列表当前的 `size`。
+ * - 普通评论列表为空时结束分页，即使已加载数量尚未达到 `normal_num`。
  * - 列表字段在为空时接口可能返回 `null`。
  * - 嵌套结构依次为：
  *   `CommentListResponse → CommentGroup → CommentReply → CommentItem / CommentUser`。
@@ -26,11 +30,11 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 internal data class CommentListResponse(
-    /** 热门评论列表（主评论 + 其下若干条回复）。接口可能返回 `null`。 */
+    /** 热门评论列表（主评论 + 其下若干条回复）。首屏完整返回，后续页为占位字段。 */
     @SerialName("hot_comments")
     val hotComments: List<CommentGroup>? = null,
 
-    /** 热门评论总数，用于判断是否还有下一页。 */
+    /** 热门评论总量。 */
     @SerialName("hot_num")
     val hotNum: Int = 0,
 
@@ -38,7 +42,7 @@ internal data class CommentListResponse(
     @SerialName("normal_comments")
     val normalComments: List<CommentGroup>? = null,
 
-    /** 普通评论总数，用于判断是否还有下一页。 */
+    /** 普通评论总量，用于判断是否还有普通评论分页。 */
     @SerialName("normal_num")
     val normalNum: Int = 0,
 )

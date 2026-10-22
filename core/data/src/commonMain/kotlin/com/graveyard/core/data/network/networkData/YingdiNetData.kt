@@ -124,11 +124,11 @@ internal class YingdiNetData(
     /**
      * 评论列表（游标分页）：`POST /web/post/comment-list`。
      *
-     * - [lastCommentId] 是**不透明游标**：首页传 `0`，之后必须把服务端上一次返回的游标
-     *   原样传回。热门排序下评论 id 会来回跳，客户端不能自己递增、排序或去重后当游标。
+     * - [lastCommentId] 首页传 `0`；后续游标必须来自上次响应原始 `normal_comments` 末项的
+     *   `main_comment.comment.id`，在映射、去重和展示处理之前读取，不能使用热评或回复 id。
      * - 切换 [order] 或 [voteFaction] 时，调用方必须把游标重置为 `0` 并清空已有数据。
-     * - 响应同时包含 `hot_comments` 与 `normal_comments` 两个列表，
-     *   判断是否还有下一页看 `hot_num + normal_num`，不能用 `size` 比较。
+     * - 首页返回完整 `hot_comments`；后续页的 `hot_comments` 是占位字段，调用方应忽略。
+     * - `hot_num` 和 `normal_num` 是对应评论列表的总量；普通评论累计数量达到 `normal_num` 或返回空列表时结束分页。
      *
      * @param order 排序方式，只接受 `hot`（热门优先）或 `created`（按时间）。
      * @param voteFaction 表态/阵营过滤，`0` 表示不按阵营过滤。

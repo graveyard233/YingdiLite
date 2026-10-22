@@ -1645,6 +1645,15 @@
         captureState: readPosition,
         reset,
 
+        scrollToTop() {
+          if (!current) return;
+          stopRestore();
+          cancelAnimationFrame(scrollFrame);
+          const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          window.scrollTo({ top: 0, left: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
+          reportPosition();
+        },
+
         render(payload, context) {
           reset();
           current = context;

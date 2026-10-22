@@ -2,18 +2,19 @@ package com.graveyard.feature.news.ui.articleDetail.screen
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
@@ -21,10 +22,18 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import androidx.paging.PagingData
+import androidx.paging.compose.collectAsLazyPagingItems
+import com.graveyard.core.data.repository.ArticleCommentsFeed
+import com.graveyard.core.designsystem.webview.RichContentReadingState
+import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleCommentThread
+import com.graveyard.core.model.news.ArticleCommentsMetadata
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.viewmodel.ArticleUiState
-import com.graveyard.core.designsystem.webview.RichContentReadingState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 private const val DETAIL_PAGE = 0
@@ -34,6 +43,9 @@ private const val PAGE_COUNT = 2
 @Composable
 internal fun ArticlePaneHost(
     uiState: ArticleUiState,
+    commentsFeed: ArticleCommentsFeed?,
+    commentsMetadata: ArticleCommentsMetadata?,
+    commentOrder: ArticleCommentOrder,
     presentation: NewsPresentation,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
@@ -46,7 +58,25 @@ internal fun ArticlePaneHost(
     onWriteCommentClick: () -> Unit = {},
     onFireClick: () -> Unit = {},
     onFavoriteClick: () -> Unit = {},
+    onLoadComments: () -> Unit,
+    onCommentOrderSelected: (ArticleCommentOrder) -> Unit,
+    onCommentLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onCommentDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onCommentMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
 ) {
+    // Keep the presenter and scroll position outside the single/dual-pane branches.
+    val commentsFlow: Flow<PagingData<ArticleCommentThread>> = remember(commentsFeed) {
+        commentsFeed?.comments ?: emptyFlow()
+    }
+    val comments = commentsFlow.collectAsLazyPagingItems()
+    val commentsListState = rememberLazyListState()
+    var lastCommentOrder by rememberSaveable { mutableStateOf(commentOrder.name) }
+    LaunchedEffect(commentOrder) {
+        if (lastCommentOrder != commentOrder.name) {
+            commentsListState.scrollToItem(0)
+            lastCommentOrder = commentOrder.name
+        }
+    }
     val pageState = rememberSaveableStateHolder()
     var singlePaneFocus by rememberSaveable { mutableStateOf(DETAIL_PAGE) }
     val pagerState = rememberPagerState(
@@ -54,6 +84,11 @@ internal fun ArticlePaneHost(
         pageCount = { PAGE_COUNT },
     )
     val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(presentation.panesSideBySide, pagerState.settledPage, presentation.interactive) {
+        if (presentation.interactive && (presentation.panesSideBySide || pagerState.settledPage == COMMENTS_PAGE)) {
+            onLoadComments()
+        }
+    }
     // Latched on the first progress frame of a predictive gesture; consumed on completion/cancel.
     var predictiveBackInProgress by remember { mutableStateOf(false) }
     val backHandlerState = rememberNavigationEventState(
@@ -152,7 +187,23 @@ internal fun ArticlePaneHost(
                 }
                 Box {
                     pageState.SaveableStateProvider(COMMENTS_PAGE) {
-                        ArticleCommentsPage(uiState, ::handleBack, showBack = false)
+                        ArticleCommentsPage(
+                            uiState = uiState,
+                            hasCommentsSession = commentsFeed != null,
+                            commentsMetadata = commentsMetadata,
+                            commentOrder = commentOrder,
+                            comments = comments,
+                            listState = commentsListState,
+                            likeNum = likeNum,
+                            onBack = ::handleBack,
+                            showBack = false,
+                            onLoadComments = onLoadComments,
+                            onOrderSelected = onCommentOrderSelected,
+                            onImageClick = onImageClick,
+                            onLikeClicked = onCommentLikeClicked,
+                            onDislikeClicked = onCommentDislikeClicked,
+                            onMoreClicked = onCommentMoreClicked,
+                        )
                     }
                 }
             },
@@ -197,7 +248,19 @@ internal fun ArticlePaneHost(
 
                 COMMENTS_PAGE -> ArticleCommentsPage(
                     uiState = uiState,
+                    hasCommentsSession = commentsFeed != null,
+                    commentsMetadata = commentsMetadata,
+                    commentOrder = commentOrder,
+                    comments = comments,
+                    listState = commentsListState,
+                    likeNum = likeNum,
                     onBack = ::handleBack,
+                    onLoadComments = onLoadComments,
+                    onOrderSelected = onCommentOrderSelected,
+                    onImageClick = onImageClick,
+                    onLikeClicked = onCommentLikeClicked,
+                    onDislikeClicked = onCommentDislikeClicked,
+                    onMoreClicked = onCommentMoreClicked,
                 )
             }
         }

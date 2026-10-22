@@ -123,6 +123,12 @@ private class IosWebViewContainer(
         if (content.superview === this) content.setFrame(bounds)
     }
 
+    fun stopScroll() {
+        coordinator.cancel()
+        scrollCoordinator?.cancelGesture()
+        content.scrollView.setContentOffset(content.scrollView.contentOffset, animated = false)
+    }
+
     fun dispose() {
         coordinator.cancel()
         scrollCoordinator?.dispose()
@@ -510,6 +516,13 @@ private class IosWebViewPort(private val configuration: WebViewConfiguration) : 
         view.evaluateJavaScript(script) { _, error ->
             if (!destroyed && error != null) onLoad?.invoke(WebLoadEvent.Failed(navigationId, error.localizedDescription))
         }
+    }
+
+    override fun stopScroll() {
+        if (destroyed) return
+        val container = view.superview as? IosWebViewContainer
+        if (container != null) container.stopScroll()
+        else view.scrollView.setContentOffset(view.scrollView.contentOffset, animated = false)
     }
 
     fun attach() {
