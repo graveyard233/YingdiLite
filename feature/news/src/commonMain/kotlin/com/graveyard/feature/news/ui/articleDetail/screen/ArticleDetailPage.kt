@@ -49,11 +49,15 @@ import com.graveyard.core.designsystem.webview.RichContentView
 import com.graveyard.core.designsystem.webview.platform.WebNavigationDecision
 import com.graveyard.core.designsystem.webview.platform.WebViewInteraction
 import com.graveyard.feature.news.ui.articleDetail.NEWS_CARD_MESSAGE
+import com.graveyard.feature.news.ui.articleDetail.NEWS_CARD_TYPE_ARTICLE
+import com.graveyard.feature.news.ui.articleDetail.NEWS_CARD_TYPE_POST
 import com.graveyard.feature.news.ui.articleDetail.NEWS_DECK_MESSAGE
+import com.graveyard.feature.news.ui.articleDetail.NEWS_USER_CARD_MESSAGE
 import com.graveyard.feature.news.ui.articleDetail.NewsDeckMessage
 import com.graveyard.feature.news.ui.articleDetail.NewsDetailTemplate
 import com.graveyard.feature.news.ui.articleDetail.asNewsCardOpen
 import com.graveyard.feature.news.ui.articleDetail.asNewsDeckMessage
+import com.graveyard.feature.news.ui.articleDetail.asNewsUserCardOpen
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.webview.RichContentEvent
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleInteractionBar
@@ -249,7 +253,20 @@ internal fun ArticleDetailPage(
                             is RichContentEvent.TemplateMessage -> {
                                 when (event.name) {
                                     NEWS_DECK_MESSAGE -> event.asNewsDeckMessage()?.let(::onDeckMessage)
-                                    NEWS_CARD_MESSAGE -> event.asNewsCardOpen()?.let { onCardOpen(it.id, it.title) }
+                                    NEWS_CARD_MESSAGE -> event.asNewsCardOpen()?.let { message ->
+                                        when (message.type) {
+                                            NEWS_CARD_TYPE_ARTICLE -> onCardOpen(message.id, message.title)
+                                            NEWS_CARD_TYPE_POST -> {
+                                                // TODO: open the community post detail using message.id and message.title.
+                                                Unit
+                                            }
+                                            else -> Unit
+                                        }
+                                    }
+                                    NEWS_USER_CARD_MESSAGE -> event.asNewsUserCardOpen()?.let { message ->
+                                        // TODO: open the user profile using message.id and message.username.
+                                        Unit
+                                    }
                                     else -> Unit
                                 }
                             }

@@ -73,10 +73,6 @@ kotlin {
 
             implementation(libs.kotlinx.coroutines.core)
 
-            implementation(project.dependencies.platform(libs.coil.bom))
-            implementation(libs.coil.compose)
-            implementation(libs.coil.network.ktor)
-
             implementation(libs.androidx.room3.runtime)
             implementation(libs.androidx.sqlite.bundled)
 

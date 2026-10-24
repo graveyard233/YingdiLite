@@ -24,7 +24,6 @@ import androidx.compose.material3.FlexibleBottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,10 +40,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.ArticleCommentOrder
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
+import yingdilite.feature.news.generated.resources.article_comments_order_checked
 import yingdilite.feature.news.generated.resources.article_comments_write_short
 import yingdilite.feature.news.generated.resources.article_comments_order_created
 import yingdilite.feature.news.generated.resources.article_comments_order_hot
@@ -167,6 +168,11 @@ private fun CommentOrderMenu(
         DropdownMenu(
             expanded = expanded && enabled,
             onDismissRequest = { expanded = false },
+            shape = MaterialTheme.shapes.large,
+            properties = PopupProperties(
+                focusable = true,
+                clippingEnabled = false,
+            ),
         ) {
             ArticleCommentOrder.entries.forEach { option ->
                 DropdownMenuItem(
@@ -176,7 +182,9 @@ private fun CommentOrderMenu(
                         if (option != order) onOrderSelected(option)
                     },
                     leadingIcon = {
-                        RadioButton(selected = option == order, onClick = null)
+                        if (option == order) {
+                            Icon(AppIcon.Check.imageVector,stringResource(Res.string.article_comments_order_checked))
+                        }
                     },
                 )
             }

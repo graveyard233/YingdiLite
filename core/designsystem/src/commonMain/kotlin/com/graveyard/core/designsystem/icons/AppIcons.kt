@@ -39,4 +39,5 @@ enum class AppIcon(val imageVector: ImageVector) {
     FireFill(fireFill),
     ToTop(toTop),
     Reply(reply),
+    Check(check)
 }

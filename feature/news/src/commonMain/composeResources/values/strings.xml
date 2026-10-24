@@ -71,6 +71,7 @@
     <string name="article_to_top">Back to top</string>
     <string name="article_comments_order_hot">Top</string>
     <string name="article_comments_order_created">Newest</string>
+    <string name="article_comments_order_checked">Check</string>
     <string name="article_comments_hot_section">Top comments</string>
     <string name="article_comments_normal_section">Latest discussion</string>
     <string name="article_comments_load_failed">Failed to load comments</string>

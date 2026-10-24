@@ -73,10 +73,6 @@ kotlin {
                 implementation(libs.androidx.paging.compose)
                 implementation(libs.kotlinx.serialization.json)
 
-                implementation(project.dependencies.platform(libs.coil.bom))
-                implementation(libs.coil.compose)
-                implementation(libs.coil.network.ktor)
-
                 implementation(libs.androidx.navigation3.ui)
                 implementation(libs.androidx.lifecycle.viewmodelNavigation3)
                 implementation(libs.androidx.lifecycle.runtimeCompose)

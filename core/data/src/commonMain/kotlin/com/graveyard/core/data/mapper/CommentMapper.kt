@@ -33,7 +33,7 @@ private fun CommentItem.toArticleComment(author: CommentUser, action: Int): Arti
     ArticleComment(
         id = id,
         content = sanitizeCommentContent(content),
-        imageUrls = imgs.split(Regex(",(?=\\s*https?://)")).map(String::trim).filter(String::isNotEmpty),
+        imageUrls = splitCommentImageUrls(imgs),
         replyNum = replyNum,
         likeNum = likeNum,
         hateNum = hateNum,
@@ -52,6 +52,16 @@ private fun CommentItem.toArticleComment(author: CommentUser, action: Int): Arti
             badgeJson = author.badgeJson,
         ),
     )
+
+/**
+ * The `imgs` field packs multiple image URLs separated by a backtick, e.g.
+ * `https://a/1.jpeg`https://b/2.gif`. Commas are also accepted as a separator
+ * for older responses, but only when not part of a URL.
+ */
+private fun splitCommentImageUrls(raw: String): List<String> =
+    raw.split(Regex("[`\\s]+|,(?=\\s*https?://)"))
+        .map(String::trim)
+        .filter(String::isNotEmpty)
 
 private fun sanitizeCommentContent(raw: String): String {
     if (raw.isBlank()) return ""

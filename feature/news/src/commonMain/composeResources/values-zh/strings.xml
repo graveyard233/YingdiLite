@@ -71,6 +71,7 @@
     <string name="article_to_top">回到顶部</string>
     <string name="article_comments_order_hot">综合</string>
     <string name="article_comments_order_created">时间</string>
+    <string name="article_comments_order_checked">选中</string>
     <string name="article_comments_hot_section">热门评论</string>
     <string name="article_comments_normal_section">最新讨论</string>
     <string name="article_comments_load_failed">评论加载失败</string>

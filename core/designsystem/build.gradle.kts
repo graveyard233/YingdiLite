@@ -79,9 +79,10 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
 
-                implementation(project.dependencies.platform(libs.coil.bom))
-                implementation(libs.coil.compose)
-                implementation(libs.coil.network.ktor)
+                api(project.dependencies.platform(libs.coil.bom))
+                api(libs.coil.compose)
+                api(libs.coil.network.ktor)
+                api(libs.coil.gif)
             }
         }
 
