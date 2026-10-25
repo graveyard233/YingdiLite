@@ -49,6 +49,7 @@ internal fun ArticlePaneHost(
     readingState: RichContentReadingState,
     onRetry: () -> Unit,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
+    onViewReplies: (commentId: Long) -> Unit,
     onCardOpen: (id: String, title: String) -> Unit = { _, _ -> },
     replyNum: String = "",
     likeNum: String = "",
@@ -82,6 +83,12 @@ internal fun ArticlePaneHost(
         pageCount = { PAGE_COUNT },
     )
     val coroutineScope = rememberCoroutineScope()
+    fun openReplies(commentId: Long) {
+        if (!presentation.interactive) return
+        singlePaneFocus = COMMENTS_PAGE
+        pagerState.requestScrollToPage(COMMENTS_PAGE)
+        onViewReplies(commentId)
+    }
     LaunchedEffect(presentation.panesSideBySide, pagerState.settledPage, presentation.interactive) {
         if (presentation.interactive && (presentation.panesSideBySide || pagerState.settledPage == COMMENTS_PAGE)) {
             onLoadComments()
@@ -95,9 +102,10 @@ internal fun ArticlePaneHost(
         forwardInfo = emptyList(),
     )
     LaunchedEffect(presentation.panesSideBySide) {
+        // A thread opened from the wide comments pane must also return to comments on a phone.
+        pagerState.requestScrollToPage(singlePaneFocus)
         if (presentation.panesSideBySide) {
             // Abort a partially dragged page without persisting its pixel offset.
-            pagerState.requestScrollToPage(singlePaneFocus)
             return@LaunchedEffect
         }
         launch {
@@ -151,7 +159,7 @@ internal fun ArticlePaneHost(
 
     NavigationBackHandler(
         state = backHandlerState,
-        isBackEnabled = presentation.interactive && commentsAwaitingBack,
+        isBackEnabled = presentation.interactive && !presentation.repliesVisible && commentsAwaitingBack,
         onBackCancelled = {
             predictiveBackInProgress = false
             coroutineScope.launch { pagerState.animateScrollToPage(COMMENTS_PAGE) }
@@ -183,7 +191,7 @@ internal fun ArticlePaneHost(
                         )
                     }
                 }
-                Box {
+                if (!presentation.repliesVisible) Box {
                     pageState.SaveableStateProvider(COMMENTS_PAGE) {
                         ArticleCommentsPage(
                             commentsState = commentsState,
@@ -198,6 +206,7 @@ internal fun ArticlePaneHost(
                             onLikeClicked = onCommentLikeClicked,
                             onDislikeClicked = onCommentDislikeClicked,
                             onMoreClicked = onCommentMoreClicked,
+                            onViewReplies = ::openReplies,
                         )
                     }
                 }
@@ -206,10 +215,10 @@ internal fun ArticlePaneHost(
             val detailWidth = (presentation.detailWidth * density).toInt().coerceIn(0, constraints.maxWidth)
             val commentsX = (presentation.commentsStart * density).toInt().coerceIn(detailWidth, constraints.maxWidth)
             val detail = measurables[0].measure(Constraints.fixed(detailWidth, constraints.maxHeight))
-            val comments = measurables[1].measure(Constraints.fixed(constraints.maxWidth - commentsX, constraints.maxHeight))
+            val comments = measurables.getOrNull(1)?.measure(Constraints.fixed(constraints.maxWidth - commentsX, constraints.maxHeight))
             layout(constraints.maxWidth, constraints.maxHeight) {
                 detail.place(0, 0)
-                comments.place(commentsX, 0)
+                comments?.place(commentsX, 0)
             }
         }
     } else HorizontalPager(
@@ -253,6 +262,7 @@ internal fun ArticlePaneHost(
                     onLikeClicked = onCommentLikeClicked,
                     onDislikeClicked = onCommentDislikeClicked,
                     onMoreClicked = onCommentMoreClicked,
+                    onViewReplies = ::openReplies,
                 )
             }
         }

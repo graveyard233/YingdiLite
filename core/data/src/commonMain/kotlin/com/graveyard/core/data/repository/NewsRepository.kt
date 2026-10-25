@@ -3,6 +3,7 @@ package com.graveyard.core.data.repository
 import androidx.paging.PagingData
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleReplyOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
 import com.graveyard.core.model.news.TagInfo
@@ -31,4 +32,11 @@ interface NewsRepository {
         order: ArticleCommentOrder,
         pageSize: Int = 20,
     ): ArticleCommentsFeed
+
+    /** Replies start at cursor zero; the caller owns caching the flow in its lifecycle scope. */
+    fun getArticleReplies(
+        commentId: Long,
+        order: ArticleReplyOrder = ArticleReplyOrder.Descending,
+        pageSize: Int = 10,
+    ): ArticleRepliesFeed
 }

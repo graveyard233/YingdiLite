@@ -1,6 +1,7 @@
 package com.graveyard.core.data.network
 
 import com.graveyard.core.data.network.model.ArticleContentResponse
+import com.graveyard.core.data.network.model.CommentGroup
 import com.graveyard.core.data.network.model.CommentListResponse
 import com.graveyard.core.data.network.model.NewsListResponse
 import com.graveyard.core.data.network.model.TagDetail
@@ -42,5 +43,15 @@ internal interface YingdiData {
         voteFaction: Int,
     ): CommentListResponse
 
-
+    /**
+     * First page uses cursor 0; subsequent cursors come from the last raw reply's comment ID.
+     * An empty or short reply page ends pagination. Changing order resets the cursor to 0.
+     * @param order `desc` 为时间倒序，`asc` 为时间正序。
+     * */
+    suspend fun getCommentMore(
+        commentId: Long,
+        lastReplyId: Long,
+        order: String,
+        size: Int = 10,
+    ): CommentGroup
 }

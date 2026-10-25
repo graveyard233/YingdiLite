@@ -8,10 +8,12 @@ import com.graveyard.core.data.mapper.toNewsBanner
 import com.graveyard.core.data.mapper.toTagInfo
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.paging.ArticleCommentsPagingSource
+import com.graveyard.core.data.paging.ArticleRepliesPagingSource
 import com.graveyard.core.data.paging.NewsPagingSource
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.data.result.toDataException
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleReplyOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
 import com.graveyard.core.model.news.TagInfo
@@ -145,4 +147,43 @@ internal class DefaultNewsRepository(
         )
     }
 
+    override fun getArticleReplies(
+        commentId: Long,
+        order: ArticleReplyOrder,
+        pageSize: Int,
+    ): ArticleRepliesFeed {
+        require(pageSize > 0) { "pageSize must be greater than zero" }
+
+        val state = MutableStateFlow(ArticleRepliesFeedState())
+        val replies = Pager(
+            config = PagingConfig(
+                pageSize = pageSize,
+                initialLoadSize = pageSize,
+                enablePlaceholders = false,
+                prefetchDistance = (pageSize / 2).coerceAtLeast(1),
+            ),
+            initialKey = 0L,
+            pagingSourceFactory = {
+                val generation = state.updateAndGet { current ->
+                    current.copy(generation = current.generation + 1)
+                }.generation
+                ArticleRepliesPagingSource(
+                    remoteDataSource = remoteDataSource,
+                    commentId = commentId,
+                    order = order,
+                    pageSize = pageSize,
+                    onPageLoaded = { metadata ->
+                        state.update { current ->
+                            if (current.generation == generation) current.copy(metadata = metadata) else current
+                        }
+                    },
+                )
+            },
+        ).flow
+
+        return ArticleRepliesFeed(
+            replies = replies,
+            state = state.asStateFlow(),
+        )
+    }
 }

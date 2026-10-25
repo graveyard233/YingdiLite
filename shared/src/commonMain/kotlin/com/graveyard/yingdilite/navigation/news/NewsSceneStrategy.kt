@@ -14,6 +14,7 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import com.graveyard.feature.news.navigation.ArticleRoute
+import com.graveyard.feature.news.navigation.ArticleRepliesRoute
 import com.graveyard.feature.news.navigation.LocalNewsPresentation
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
@@ -42,6 +43,18 @@ internal fun scenePresentation(scene: Scene<NavKey>): AppScenePresentation {
         scene.entries.size == 1 && scene.metadata[APP_NAVIGATION_SCENE_KEY] == true, keys)
 }
 
+/** Replacing the supporting pane must not slide the entire reading workspace. */
+internal fun isRepliesPaneChange(initial: Scene<NavKey>, target: Scene<NavKey>): Boolean {
+    val from = initial.entries.lastOrNull()?.metadata?.get(APP_ROUTE_KEY)
+    val to = target.entries.lastOrNull()?.metadata?.get(APP_ROUTE_KEY)
+    val sameArticle = (from is ArticleRepliesRoute && from.article == to) ||
+        (to is ArticleRepliesRoute && to.article == from)
+    return sameArticle && scenePresentation(initial).layoutMode in sideBySideModes &&
+        scenePresentation(target).layoutMode in sideBySideModes
+}
+
+private val sideBySideModes = setOf(NewsLayoutMode.ReadingDual, NewsLayoutMode.ReadingTriple)
+
 internal data class NewsSceneStrategy(
     val feedLayout: NewsLayout,
     val readingLayout: NewsLayout,
@@ -56,14 +69,20 @@ internal data class NewsSceneStrategy(
         if (route == NewsRoute) {
             return NewsScene(feedLayout, last, null, emptyList())
         }
-        if (route !is ArticleRoute) return null
+        if (route !is ArticleRoute && route !is ArticleRepliesRoute) return null
         // A contiguous feed/selection segment, never another tab's historic feed.
         val feedIndex = entries.indexOfLast { it.metadata[APP_ROUTE_KEY] == NewsRoute }
         if (feedIndex < 0 || entries.subList(feedIndex, entries.size).any {
                 it.metadata[APP_TOP_LEVEL_KEY] != NewsRoute ||
-                    (it.metadata[APP_ROUTE_KEY] != NewsRoute && it.metadata[APP_ROUTE_KEY] !is ArticleRoute)
+                    (it.metadata[APP_ROUTE_KEY] != NewsRoute && it.metadata[APP_ROUTE_KEY] !is ArticleRoute &&
+                        it.metadata[APP_ROUTE_KEY] !is ArticleRepliesRoute)
             }) return null
-        return NewsScene(readingLayout, entries[feedIndex], last, entries.dropLast(1))
+        val articleEntry = if (route is ArticleRepliesRoute) {
+            entries.getOrNull(entries.lastIndex - 1)?.takeIf { it.metadata[APP_ROUTE_KEY] == route.article }
+                ?: return null
+        } else last
+        return NewsScene(readingLayout, entries[feedIndex], articleEntry, entries.dropLast(1),
+            repliesEntry = last.takeIf { route is ArticleRepliesRoute })
     }
 }
 
@@ -72,12 +91,13 @@ internal data class NewsScene(
     val feedEntry: NavEntry<NavKey>,
     val articleEntry: NavEntry<NavKey>?,
     override val previousEntries: List<NavEntry<NavKey>>,
+    val repliesEntry: NavEntry<NavKey>? = null,
 ) : Scene<NavKey> {
     private val selected = articleEntry?.metadata?.get(APP_ROUTE_KEY) as? ArticleRoute
 
     // Feed selections share a workspace; linked pushes need distinct scenes for NavDisplay transitions.
     // Layout changes preserve scene identity across window resizing and pane changes.
-    override val key: Any = when (layout.mode) {
+    override val key: Any = repliesEntry?.contentKey ?: when (layout.mode) {
         NewsLayoutMode.Feed -> "news-feed"
         else -> selected?.instanceId?.takeIf { it.isNotBlank() }
             ?.let { NEWS_READING_WORKSPACE_KEY to it }
@@ -85,7 +105,8 @@ internal data class NewsScene(
     }
     override val entries = buildList {
         if (layout.list != null) add(feedEntry)
-        articleEntry?.let(::add)
+        if (repliesEntry == null || layout.comments != null) articleEntry?.let(::add)
+        repliesEntry?.let(::add)
     }
     private val presentation = AppScenePresentation(
         layout.mode, layout.showsNavigation,
@@ -93,18 +114,22 @@ internal data class NewsScene(
     )
     override val metadata = mapOf(APP_PRESENTATION_KEY to presentation)
     override val content: @Composable () -> Unit = {
-        val articleBounds = layout.article
+        val articleBounds = if (repliesEntry != null) layout.detail else layout.article
         val newsPresentation = NewsPresentation(
             layoutMode = layout.mode,
             selectedArticleId = selected?.articleId,
             listVisible = layout.list != null,
+            repliesVisible = repliesEntry != null,
             detailWidth = layout.detail?.width ?: 0f,
             commentsStart = (layout.comments?.left ?: 0f) - (articleBounds?.left ?: 0f),
         )
         CompositionLocalProvider(LocalNewsPresentation provides newsPresentation) {
             val panes = buildList {
                 layout.list?.let { add(feedEntry to it) }
-                if (articleEntry != null && articleBounds != null) add(articleEntry to articleBounds)
+                if (articleEntry != null && articleBounds != null && (repliesEntry == null || layout.comments != null)) {
+                    add(articleEntry to articleBounds)
+                }
+                if (repliesEntry != null) (layout.comments ?: layout.detail)?.let { add(repliesEntry to it) }
             }
             Layout(modifier = Modifier.fillMaxSize(), content = {
                 panes.forEach { (entry, _) -> key(entry.contentKey) { Box { entry.Content() } } }

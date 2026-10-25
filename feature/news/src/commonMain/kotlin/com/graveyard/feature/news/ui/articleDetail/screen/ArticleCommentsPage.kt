@@ -89,6 +89,7 @@ internal fun ArticleCommentsPage(
     onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onViewReplies: (commentId: Long) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val canScroll by remember(listState) {
@@ -221,7 +222,7 @@ internal fun ArticleCommentsPage(
                         }
                         items(hotComments, key = { "hot-${it.mainComment.id}" }, contentType = { "comment" }) { thread ->
                             ArticleCommentItem(
-                                thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked,
+                                thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, onViewReplies,
                                 showDivider = !showSectionBreak || thread.mainComment.id != hotComments.last().mainComment.id,
                             )
                         }
@@ -281,7 +282,7 @@ internal fun ArticleCommentsPage(
                                     comments[index]
                                 }
                                 commentsSnapshot.items.getOrNull(index)?.let { thread ->
-                                    ArticleCommentItem(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+                                    ArticleCommentItem(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, onViewReplies)
                                 }
                             }
                         }
@@ -362,7 +363,10 @@ private fun ArticleCommentsEmptyState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun CommentsRefreshError(onRetry: () -> Unit) {
+internal fun CommentsRefreshError(
+    onRetry: () -> Unit,
+    message: String = stringResource(Res.string.article_comments_refresh_failed),
+) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.errorContainer,
@@ -374,7 +378,7 @@ private fun CommentsRefreshError(onRetry: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = stringResource(Res.string.article_comments_refresh_failed),
+                text = message,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.weight(1f),
@@ -385,7 +389,7 @@ private fun CommentsRefreshError(onRetry: () -> Unit) {
 }
 
 @Composable
-private fun CommentsAppendError(message: String, onRetry: () -> Unit) {
+internal fun CommentsAppendError(message: String, onRetry: () -> Unit) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,

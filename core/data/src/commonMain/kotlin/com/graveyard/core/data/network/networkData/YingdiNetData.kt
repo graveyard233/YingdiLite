@@ -3,6 +3,7 @@ package com.graveyard.core.data.network.networkData
 import com.fleeksoft.ksoup.Ksoup
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.network.model.ArticleContentResponse
+import com.graveyard.core.data.network.model.CommentGroup
 import com.graveyard.core.data.network.model.CommentListResponse
 import com.graveyard.core.data.network.model.NewsListResponse
 import com.graveyard.core.data.network.model.TagDetail
@@ -157,6 +158,32 @@ internal class YingdiNetData(
             expectedArrayField = "normal_comments",
             allowNullArray = true,
         )
+    }
+
+    /**
+     * 获取更多评论
+     *
+     * @param order `desc` 为时间倒序，`asc` 为时间正序。
+     * */
+    override suspend fun getCommentMore(
+        commentId: Long,
+        lastReplyId: Long,
+        order: String,
+        size: Int
+    ): CommentGroup {
+        val url = "$commonBaseUrl/web/post/comment-more"
+        val response = client.post(url) {
+            setBody(
+                YingdiSignedForm.of(
+                    "comment_id" to commentId.toString(),
+                    "last_reply_id" to lastReplyId.toString(),
+                    "order" to order,
+                    "size" to size.toString()
+                )
+            )
+        }
+
+        return response.decodeResponse()
     }
 
 

@@ -1,6 +1,8 @@
 package com.graveyard.yingdilite.navigation
 
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -62,9 +64,11 @@ import com.graveyard.feature.mine.navigation.MineRoute
 import com.graveyard.feature.mine.ui.MineChildScreen
 import com.graveyard.feature.mine.ui.MineScreen
 import com.graveyard.feature.news.navigation.ArticleRoute
+import com.graveyard.feature.news.navigation.ArticleRepliesRoute
 import com.graveyard.feature.news.navigation.NewsChildRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRouteScreen
+import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRepliesRouteScreen
 import com.graveyard.feature.news.ui.newsList.screen.NewsChildScreen
 import com.graveyard.feature.news.ui.newsList.screen.NewsRouteScreen
 import com.graveyard.yingdilite.navigation.news.APP_ROUTE_KEY
@@ -76,6 +80,9 @@ import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
 import com.graveyard.yingdilite.navigation.news.openImages
 import com.graveyard.yingdilite.navigation.news.openLinkedArticle
+import com.graveyard.yingdilite.navigation.news.openReplies
+import com.graveyard.yingdilite.navigation.news.canInteractWithArticle
+import com.graveyard.yingdilite.navigation.news.isRepliesPaneChange
 import com.graveyard.yingdilite.navigation.news.scenePresentation
 import com.graveyard.yingdilite.navigation.news.selectArticle
 import kotlinx.serialization.modules.SerializersModule
@@ -95,6 +102,7 @@ private val hiddenNavigationRouteTypes = listOf(
     CardsChildRoute::class,
     MineChildRoute::class,
     ArticleRoute::class,
+    ArticleRepliesRoute::class,
     ImageGalleryRoute::class,
 )
 
@@ -110,6 +118,7 @@ fun AppNavigation(
                 polymorphic(NavKey::class) {
                     subclass(NewsRoute::class, NewsRoute.serializer())
                     subclass(ArticleRoute::class, ArticleRoute.serializer())
+                    subclass(ArticleRepliesRoute::class, ArticleRepliesRoute.serializer())
                     subclass(ImageGalleryRoute::class, ImageGalleryRoute.serializer())
                     subclass(NewsChildRoute::class, NewsChildRoute.serializer())
                     subclass(CommunityRoute::class, CommunityRoute.serializer())
@@ -161,6 +170,7 @@ fun AppNavigation(
             contentKey = when (key) {
                 is ImageGalleryRoute -> "image-gallery:${key.instanceId}"
                 is ArticleRoute -> "article:${key.instanceId.ifBlank { key.articleId }}"
+                is ArticleRepliesRoute -> "article-replies:${key.instanceId}"
                 else -> key.toString()
             },
             metadata = galleryMetadata + mapOf(
@@ -172,7 +182,7 @@ fun AppNavigation(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (key == NewsRoute || key is ArticleRoute || key is ImageGalleryRoute) {
+                    .then(if (key == NewsRoute || key is ArticleRoute || key is ArticleRepliesRoute || key is ImageGalleryRoute) {
                         Modifier
                     } else Modifier.safeDrawingPadding()),
             ) {
@@ -274,7 +284,9 @@ fun AppNavigation(
                     sceneStrategies = listOf(galleryStrategy, newsStrategy),
                     sharedTransitionScope = this,
                     transitionSpec = {
-                        slideInHorizontally(
+                        if (isRepliesPaneChange(initialState, targetState)) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else slideInHorizontally(
                             initialOffsetX = { it },
                             animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
                         ) togetherWith slideOutHorizontally(
@@ -283,7 +295,9 @@ fun AppNavigation(
                         )
                     },
                     popTransitionSpec = {
-                        slideInHorizontally(
+                        if (isRepliesPaneChange(initialState, targetState)) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else slideInHorizontally(
                             initialOffsetX = { -it },
                             animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
                         ) togetherWith slideOutHorizontally(
@@ -292,7 +306,9 @@ fun AppNavigation(
                         )
                     },
                     predictivePopTransitionSpec = {
-                        slideInHorizontally(
+                        if (isRepliesPaneChange(initialState, targetState)) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else slideInHorizontally(
                             initialOffsetX = { -it },
                             animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
                         ) togetherWith slideOutHorizontally(
@@ -316,6 +332,7 @@ private fun AppNavEntry(
     navigator: Navigator,
     onShowMessage: suspend (String) -> Unit,
 ) {
+    val interactive = LocalNewsPresentation.current.interactive
     when (key) {
         NewsRoute -> NewsRouteScreen(
             onShowMessage = onShowMessage,
@@ -329,17 +346,25 @@ private fun AppNavEntry(
                 articleTitle = key.articleTitle,
                 replyNum = key.replyNum,
                 likeNum = key.likeNum,
-                onBack = { if (navigator.state.currentKey == key) navigator.goBack() },
+                onBack = { if (interactive && navigator.canInteractWithArticle(key)) navigator.goBack() },
                 onImageClick = { urls, index ->
-                    if (navigator.state.currentKey == key) navigator.openImages(urls, index)
+                    if (interactive) navigator.openImages(urls, index, source = key)
                 },
+                onViewReplies = { commentId -> if (interactive) navigator.openReplies(key, commentId) },
                 onCardOpen = { id, title ->
                     // Cards inside an article push another article on top of the reading scene, so
                     // back returns to the article that linked here.
-                    if (navigator.state.currentKey == key) navigator.openLinkedArticle(id, title)
+                    if (interactive) navigator.openLinkedArticle(id, title, source = key)
                 },
             )
         }
+        is ArticleRepliesRoute -> ArticleRepliesRouteScreen(
+            commentId = key.commentId,
+            onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
+            onImageClick = { urls, index ->
+                if (interactive) navigator.openImages(urls, index, source = key)
+            },
+        )
         is ImageGalleryRoute -> ImageGalleryPage(
             urls = key.urls,
             initialIndex = key.initialIndex,

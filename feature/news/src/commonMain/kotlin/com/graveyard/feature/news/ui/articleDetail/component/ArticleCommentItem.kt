@@ -96,6 +96,7 @@ internal fun ArticleCommentItem(
     onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onViewReplies: (commentId: Long) -> Unit,
     modifier: Modifier = Modifier,
     showDivider: Boolean = true,
 ) {
@@ -107,14 +108,8 @@ internal fun ArticleCommentItem(
         Column(
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = if (needShowReply) 8.dp else 0.dp),
         ) {
-            CommentAuthorHeader(comment, thread.isManager, onMoreClicked = {
-                onMoreClicked(comment.id, comment.id)
-            })
-            CommentContent(comment, Modifier.padding(top = 6.dp))
-            if (comment.isVisible && !comment.authorDelete) {
-                CommentImages(comment.imageUrls, onImageClick)
-                CommentActions(comment, comment.id, onLikeClicked, onDislikeClicked)
-            }
+            CommentBody(comment, comment.id, thread.isManager, true, true,
+                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
             if (needShowReply) {
                 Column(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
@@ -128,10 +123,7 @@ internal fun ArticleCommentItem(
                     }
                     if (replyCount > replies.size) {
                         TextButton(
-                            onClick = {
-                                // TODO: Load the complete reply list.
-                            },
-                            enabled = false,
+                            onClick = { onViewReplies(comment.id) },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                             contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
                         ) {
@@ -149,6 +141,48 @@ internal fun ArticleCommentItem(
         if (showDivider) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
+    }
+}
+
+@Composable
+internal fun ArticleThreadCommentItem(
+    comment: ArticleComment,
+    parentCommentId: Long,
+    isManager: Boolean,
+    isRoot: Boolean,
+    onImageClick: (urls: List<String>, index: Int) -> Unit,
+    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 8.dp)) {
+            CommentBody(comment, parentCommentId, isManager, isRoot, isRoot,
+                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+        }
+        if (!isRoot) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+private fun CommentBody(
+    comment: ArticleComment,
+    parentCommentId: Long,
+    isManager: Boolean,
+    showLevel: Boolean,
+    collapsible: Boolean,
+    onImageClick: (urls: List<String>, index: Int) -> Unit,
+    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+) {
+    CommentAuthorHeader(comment, isManager, showLevel = showLevel, onMoreClicked = {
+        onMoreClicked(comment.id, parentCommentId)
+    })
+    CommentContent(comment, Modifier.padding(top = 6.dp), collapsible = collapsible)
+    if (comment.isVisible && !comment.authorDelete) {
+        CommentImages(comment.imageUrls, onImageClick)
+        CommentActions(comment, parentCommentId, onLikeClicked, onDislikeClicked)
     }
 }
 
@@ -175,6 +209,7 @@ private fun CommentAuthorHeader(
     comment: ArticleComment,
     isManager: Boolean,
     onMoreClicked: () -> Unit,
+    showLevel: Boolean = true,
 ) {
     val author = comment.author
     Row(
@@ -197,7 +232,7 @@ private fun CommentAuthorHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (author.level > 0) {
+                if (showLevel && author.level > 0) {
                     Text(
                         text = stringResource(Res.string.article_comment_level, author.level),
                         style = MaterialTheme.typography.labelSmall,
@@ -293,7 +328,7 @@ private fun ReplyContent(comment: ArticleComment) {
 }
 
 @Composable
-private fun CommentContent(comment: ArticleComment, modifier: Modifier = Modifier) {
+private fun CommentContent(comment: ArticleComment, modifier: Modifier = Modifier, collapsible: Boolean = true) {
     if (comment.authorDelete || !comment.isVisible) {
         Text(
             text = stringResource(Res.string.article_comment_deleted),
@@ -323,14 +358,14 @@ private fun CommentContent(comment: ArticleComment, modifier: Modifier = Modifie
                     text = text,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = if (expanded) Int.MAX_VALUE else CollapsedCommentLines,
+                    maxLines = if (!collapsible || expanded) Int.MAX_VALUE else CollapsedCommentLines,
                     overflow = TextOverflow.Ellipsis,
                     onTextLayout = { layout ->
                         // Expanded layouts must not erase the collapsed overflow state.
                         if (!expanded) canExpand = layout.hasVisualOverflow
                     },
                 )
-                if (expanded || canExpand) {
+                if (collapsible && (expanded || canExpand)) {
                     TextButton(
                         onClick = { expanded = !expanded },
                         modifier = Modifier.heightIn(min = 48.dp),

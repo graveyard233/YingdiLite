@@ -97,4 +97,15 @@
     <string name="article_comment_like_count">%1$s次赞同</string>
     <string name="article_comment_dislike_count">%1$s次不喜欢</string>
     <string name="article_comments_refresh_failed">刷新失败，仍显示上次评论</string>
+    <string name="article_replies_title">全部回复</string>
+    <string name="article_replies_back">返回评论列表</string>
+    <string name="article_replies_count">全部 %1$d 条回复</string>
+    <string name="article_replies_order_ascending">最早优先</string>
+    <string name="article_replies_order_descending">最新优先</string>
+    <string name="article_replies_order_switch">切换为%1$s</string>
+    <string name="article_replies_reply_author">回复 %1$s</string>
+    <string name="article_replies_load_failed">回复加载失败</string>
+    <string name="article_replies_loading">正在加载回复</string>
+    <string name="article_replies_empty">暂无可显示的回复</string>
+    <string name="article_replies_refresh_failed">刷新失败，仍显示上次回复</string>
 </resources>

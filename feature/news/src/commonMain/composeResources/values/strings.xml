@@ -97,4 +97,15 @@
     <string name="article_comment_like_count">%1$s likes</string>
     <string name="article_comment_dislike_count">%1$s dislikes</string>
     <string name="article_comments_refresh_failed">Refresh failed. Showing previous comments.</string>
+    <string name="article_replies_title">All replies</string>
+    <string name="article_replies_back">Back to comments</string>
+    <string name="article_replies_count">All %1$d replies</string>
+    <string name="article_replies_order_ascending">Oldest first</string>
+    <string name="article_replies_order_descending">Newest first</string>
+    <string name="article_replies_order_switch">Switch to %1$s</string>
+    <string name="article_replies_reply_author">Reply to %1$s</string>
+    <string name="article_replies_load_failed">Failed to load replies</string>
+    <string name="article_replies_loading">Loading replies</string>
+    <string name="article_replies_empty">No replies to display</string>
+    <string name="article_replies_refresh_failed">Refresh failed. Showing previous replies.</string>
 </resources>

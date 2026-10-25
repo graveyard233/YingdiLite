@@ -10,6 +10,7 @@ data class NewsPresentation(
     val selectedArticleId: String? = null,
     val listVisible: Boolean = true,
     val interactive: Boolean = true,
+    val repliesVisible: Boolean = false,
     // Pane dimensions relative to the article container, in dp (including hinge gaps).
     val detailWidth: Float = 0f,
     val commentsStart: Float = 0f,
