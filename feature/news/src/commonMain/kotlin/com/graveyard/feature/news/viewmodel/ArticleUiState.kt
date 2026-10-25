@@ -11,5 +11,4 @@ data class ArticleUiState(
     val newsAuthor: NewsAuthor = NewsAuthor(),
     val isLoading: Boolean = true,
     val error: DataError? = null,
-    val commentsError: DataError? = null,
 )

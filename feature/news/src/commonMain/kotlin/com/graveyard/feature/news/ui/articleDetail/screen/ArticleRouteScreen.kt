@@ -28,9 +28,7 @@ fun ArticleRouteScreen(
     val commentsState by viewModel.commentsState.collectAsStateWithLifecycle()
     ArticlePaneHost(
         uiState = uiState,
-        commentsFeed = commentsState.feed,
-        commentsMetadata = commentsState.metadata,
-        commentOrder = commentsState.order,
+        commentsState = commentsState,
         replyNum = replyNum,
         likeNum = likeNum,
         presentation = presentation,

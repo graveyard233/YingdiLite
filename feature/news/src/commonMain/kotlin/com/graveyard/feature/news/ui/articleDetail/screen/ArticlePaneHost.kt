@@ -24,13 +24,12 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.graveyard.core.data.repository.ArticleCommentsFeed
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.model.news.ArticleCommentOrder
 import com.graveyard.core.model.news.ArticleCommentThread
-import com.graveyard.core.model.news.ArticleCommentsMetadata
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
+import com.graveyard.feature.news.viewmodel.ArticleCommentsUiState
 import com.graveyard.feature.news.viewmodel.ArticleUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -43,9 +42,7 @@ private const val PAGE_COUNT = 2
 @Composable
 internal fun ArticlePaneHost(
     uiState: ArticleUiState,
-    commentsFeed: ArticleCommentsFeed?,
-    commentsMetadata: ArticleCommentsMetadata?,
-    commentOrder: ArticleCommentOrder,
+    commentsState: ArticleCommentsUiState,
     presentation: NewsPresentation,
     onBack: () -> Unit,
     onMoreClicked: () -> Unit,
@@ -65,11 +62,12 @@ internal fun ArticlePaneHost(
     onCommentMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
 ) {
     // Keep the presenter and scroll position outside the single/dual-pane branches.
-    val commentsFlow: Flow<PagingData<ArticleCommentThread>> = remember(commentsFeed) {
-        commentsFeed?.comments ?: emptyFlow()
+    val commentsFlow: Flow<PagingData<ArticleCommentThread>> = remember(commentsState.feed) {
+        commentsState.feed?.comments ?: emptyFlow()
     }
     val comments = commentsFlow.collectAsLazyPagingItems()
     val commentsListState = rememberLazyListState()
+    val commentOrder = commentsState.order
     var lastCommentOrder by rememberSaveable { mutableStateOf(commentOrder.name) }
     LaunchedEffect(commentOrder) {
         if (lastCommentOrder != commentOrder.name) {
@@ -188,10 +186,7 @@ internal fun ArticlePaneHost(
                 Box {
                     pageState.SaveableStateProvider(COMMENTS_PAGE) {
                         ArticleCommentsPage(
-                            uiState = uiState,
-                            hasCommentsSession = commentsFeed != null,
-                            commentsMetadata = commentsMetadata,
-                            commentOrder = commentOrder,
+                            commentsState = commentsState,
                             comments = comments,
                             listState = commentsListState,
                             likeNum = likeNum,
@@ -247,10 +242,7 @@ internal fun ArticlePaneHost(
                 )
 
                 COMMENTS_PAGE -> ArticleCommentsPage(
-                    uiState = uiState,
-                    hasCommentsSession = commentsFeed != null,
-                    commentsMetadata = commentsMetadata,
-                    commentOrder = commentOrder,
+                    commentsState = commentsState,
                     comments = comments,
                     listState = commentsListState,
                     likeNum = likeNum,

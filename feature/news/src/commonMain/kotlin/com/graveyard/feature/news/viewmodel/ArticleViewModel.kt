@@ -4,12 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
+import androidx.paging.filter
+import androidx.paging.map
 import com.graveyard.core.data.repository.ArticleCommentsFeed
 import com.graveyard.core.data.repository.NewsRepository
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleCommentThread
 import com.graveyard.core.model.news.ArticleCommentsMetadata
 import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +23,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -78,7 +82,7 @@ class ArticleViewModel(
         if (mutableCommentsState.value.feed != null) return
         val postId = articleId.toLongOrNull()?.takeIf { it > 0L }
         if (postId == null) {
-            mutableUiState.update { it.copy(commentsError = DataError.Parsing) }
+            mutableCommentsState.update { it.copy(error = DataError.Parsing) }
             return
         }
         val feed = repository.getArticleComments(
@@ -89,25 +93,42 @@ class ArticleViewModel(
         val sessionJob = SupervisorJob(viewModelScope.coroutineContext[Job])
         commentsSessionJob = sessionJob
         val sessionScope = CoroutineScope(viewModelScope.coroutineContext + sessionJob)
-        mutableUiState.update { it.copy(commentsError = null) }
-        val sessionFeed = feed.copy(comments = feed.comments.cachedIn(sessionScope))
-        mutableCommentsState.update { it.copy(feed = sessionFeed, metadata = null) }
+        val sessionFeed = feed.copy(
+            comments = feed.comments
+                .map { pagingData ->
+                    pagingData
+                        .filter { it.mainComment.isVisible }
+                        .map { it.withVisibleReplies() }
+                }
+                .cachedIn(sessionScope),
+        )
+        mutableCommentsState.update { it.copy(feed = sessionFeed, metadata = null, error = null) }
         // The first-page metadata travels next to the paging data, so the UI never has to look
         // inside the list for it. A failed refresh keeps the last successful metadata.
         sessionScope.launch {
-            feed.state.collect { feedState ->
+            feed.state.map { it.metadata }.distinctUntilChanged().collect { rawMetadata ->
+                val metadata = rawMetadata?.let {
+                    it.copy(
+                        hotComments = it.hotComments
+                            .filter { thread -> thread.mainComment.isVisible }
+                            .map { thread -> thread.withVisibleReplies() },
+                    )
+                }
                 mutableCommentsState.update { current ->
-                    if (current.feed === sessionFeed) current.copy(metadata = feedState.metadata) else current
+                    if (current.feed === sessionFeed) current.copy(metadata = metadata) else current
                 }
             }
         }
     }
 
+    private fun ArticleCommentThread.withVisibleReplies(): ArticleCommentThread =
+        copy(replies = replies.filter { it.isVisible })
+
     fun selectCommentOrder(order: ArticleCommentOrder) {
         if (mutableCommentsState.value.order == order) return
         commentsSessionJob?.cancel()
         commentsSessionJob = null
-        mutableCommentsState.update { it.copy(order = order, feed = null) }
+        mutableCommentsState.update { it.copy(order = order, feed = null, metadata = null, error = null) }
         loadComments()
     }
 
@@ -137,4 +158,6 @@ data class ArticleCommentsUiState(
     val feed: ArticleCommentsFeed? = null,
     /** Latest first page of [feed]; kept while a refresh is loading or after it failed. */
     val metadata: ArticleCommentsMetadata? = null,
+    /** Failure to create a session; request failures are reported by Paging. */
+    val error: DataError? = null,
 )

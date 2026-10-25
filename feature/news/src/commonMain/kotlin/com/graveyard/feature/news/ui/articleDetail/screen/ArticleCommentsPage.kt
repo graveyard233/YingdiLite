@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -30,6 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,32 +42,33 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
+import com.graveyard.core.data.result.DataError
+import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.ArticleCommentOrder
 import com.graveyard.core.model.news.ArticleCommentThread
-import com.graveyard.core.model.news.ArticleCommentsMetadata
-import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentCard
+import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentItem
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentsBottomBar
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentsBottomBarHeight
 import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
 import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
-import com.graveyard.feature.news.viewmodel.ArticleUiState
+import com.graveyard.feature.news.viewmodel.ArticleCommentsUiState
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.article_back_to_detail
 import yingdilite.feature.news.generated.resources.article_comments_empty_message
 import yingdilite.feature.news.generated.resources.article_comments_empty_title
+import yingdilite.feature.news.generated.resources.article_comments_hot_count
 import yingdilite.feature.news.generated.resources.article_comments_hot_section
 import yingdilite.feature.news.generated.resources.article_comments_load_failed
 import yingdilite.feature.news.generated.resources.article_comments_normal_section
 import yingdilite.feature.news.generated.resources.article_comments_refresh_failed
-import yingdilite.feature.news.generated.resources.article_comments_sorted_empty_message
-import yingdilite.feature.news.generated.resources.article_comments_sorted_empty_title
 import yingdilite.feature.news.generated.resources.article_comments_title
 import yingdilite.feature.news.generated.resources.news_load_more_failed
 import yingdilite.feature.news.generated.resources.news_loading_more
@@ -71,10 +77,7 @@ import yingdilite.feature.news.generated.resources.news_retry
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ArticleCommentsPage(
-    uiState: ArticleUiState,
-    hasCommentsSession: Boolean,
-    commentsMetadata: ArticleCommentsMetadata?,
-    commentOrder: ArticleCommentOrder,
+    commentsState: ArticleCommentsUiState,
     comments: LazyPagingItems<ArticleCommentThread>,
     listState: LazyListState,
     likeNum: String,
@@ -88,40 +91,19 @@ internal fun ArticleCommentsPage(
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val canScroll by remember(listState) {
+        derivedStateOf { listState.canScrollForward || listState.canScrollBackward }
+    }
     val bottomBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior(
-        canScroll = { listState.canScrollForward || listState.canScrollBackward },
+        canScroll = { canScroll },
         snapAnimationSpec = tween(150),
     )
-    LaunchedEffect(listState.canScrollForward, listState.canScrollBackward) {
-        if (!listState.canScrollForward && !listState.canScrollBackward) {
+    LaunchedEffect(canScroll) {
+        if (!canScroll) {
             bottomBarScrollBehavior.state.heightOffset = 0f
             bottomBarScrollBehavior.state.contentOffset = 0f
         }
     }
-    val refreshState = comments.loadState.refresh
-    // Capture the presented snapshot once. The count, the item keys and the rendered rows must all
-    // come from this same instance: after a refresh replaces the feed with a shorter page, lazy
-    // items built from the old count are still measured, and reading the live list with one of
-    // their indices throws IndexOutOfBoundsException.
-    val commentsSnapshot = comments.itemSnapshotList
-    // Hot comments and counts arrive with the first page, but travel next to the list instead of
-    // inside it. An empty feed can therefore still show its hot section.
-    val hotComments = if (commentOrder == ArticleCommentOrder.Hot) commentsMetadata?.hotComments.orEmpty() else emptyList()
-    val normalCount = commentsSnapshot.size
-    val hasPresentedComments = hotComments.isNotEmpty() || normalCount > 0
-    val refreshError = refreshState as? LoadState.Error
-    val appendState = comments.loadState.append
-    val notStarted = !hasCommentsSession && uiState.commentsError == null
-    // Metadata is published right before Paging delivers the page, so a refresh that is still
-    // loading keeps the content slot until the list itself has something to present.
-    val awaitingFirstPage = hasCommentsSession && refreshError == null &&
-        (commentsMetadata == null || (refreshState is LoadState.Loading && !hasPresentedComments))
-    val initialLoading = notStarted || awaitingFirstPage
-    val initialError = (refreshError != null && !hasPresentedComments && commentsMetadata == null) ||
-        (!hasCommentsSession && uiState.commentsError != null)
-    val showEmpty = commentsMetadata != null && !hasPresentedComments && !initialLoading && !initialError
-    val isSortedEmpty = commentOrder == ArticleCommentOrder.Created && (commentsMetadata?.hotNum ?: 0) > 0
-
     Scaffold(
         modifier = Modifier.fillMaxSize().nestedScroll(bottomBarScrollBehavior.nestedScrollConnection),
         topBar = {
@@ -144,7 +126,7 @@ internal fun ArticleCommentsPage(
             ) {
                 ArticleCommentsBottomBar(
                     likeNum = likeNum,
-                    commentOrder = commentOrder,
+                    commentOrder = commentsState.order,
                     onOrderSelected = onOrderSelected,
                     onToTopClick = {
                         coroutineScope.launch {
@@ -168,6 +150,24 @@ internal fun ArticleCommentsPage(
             top = scaffoldPadding.calculateTopPadding(),
             end = scaffoldPadding.calculateEndPadding(layoutDirection),
         )
+        val loadState = comments.loadState
+        val refreshState = loadState.refresh
+        val appendState = loadState.append
+        // Count, keys and rows share one snapshot so a shorter refresh cannot invalidate old indices.
+        val commentsSnapshot = comments.itemSnapshotList
+        val hotComments = if (commentsState.order == ArticleCommentOrder.Hot) {
+            commentsState.metadata?.hotComments.orEmpty()
+        } else emptyList()
+        val normalCount = commentsSnapshot.size
+        val showSectionBreak = hotComments.isNotEmpty() && normalCount > 0
+        val bodyState = resolveCommentsBodyState(
+            commentsState = commentsState,
+            hasPresentedComments = hotComments.isNotEmpty() || normalCount > 0,
+            refreshState = refreshState,
+            appendState = appendState,
+        )
+        val hasCommentsSession = commentsState.feed != null
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -176,67 +176,97 @@ internal fun ArticleCommentsPage(
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 .clipToBounds(),
         ) {
-            if (refreshError != null && commentsMetadata != null) {
+            if (bodyState == CommentsBodyState.Content && refreshState is LoadState.Error) {
                 CommentsRefreshError(onRetry = { comments.retry() })
             }
             CommonList(
                 state = listState,
-                isRefreshing = refreshState is LoadState.Loading && (hasPresentedComments || commentsMetadata != null),
+                isRefreshing = bodyState == CommentsBodyState.Content && refreshState is LoadState.Loading,
                 onRefresh = { if (hasCommentsSession) comments.refresh() else onLoadComments() },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
                     top = 8.dp,
                     bottom = ArticleCommentsBottomBarHeight + 16.dp,
                 ),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
                 header = {
-                    if (hotComments.isNotEmpty()) {
-                        item(key = "hot-comments-heading") {
-                            Text(
-                                text = stringResource(Res.string.article_comments_hot_section),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 2.dp),
+                    if (bodyState == CommentsBodyState.Content) {
+                        if (hotComments.isNotEmpty()) {
+                            item(key = "hot-comments-heading", contentType = "hot-heading") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                                        .padding(top = 4.dp, bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(Res.string.article_comments_hot_section),
+                                        modifier = Modifier.weight(1f, fill = false).alignByBaseline(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = stringResource(
+                                            Res.string.article_comments_hot_count,
+                                            hotComments.size,
+                                        ),
+                                        modifier = Modifier.alignByBaseline(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        items(hotComments, key = { "hot-${it.mainComment.id}" }, contentType = { "comment" }) { thread ->
+                            ArticleCommentItem(
+                                thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked,
+                                showDivider = !showSectionBreak || thread.mainComment.id != hotComments.last().mainComment.id,
                             )
                         }
-                    }
-                    items(hotComments, key = { "hot-${it.mainComment.id}" }) { thread ->
-                        ArticleCommentCard(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
-                    }
-                    if (normalCount > 0) {
-                        item(key = "normal-comments-heading") {
-                            Text(
-                                text = stringResource(Res.string.article_comments_normal_section),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
-                            )
+                        if (normalCount > 0) {
+                            item(key = "normal-comments-heading", contentType = "normal-heading") {
+                                Column {
+                                    if (showSectionBreak) {
+                                        Box(
+                                            Modifier.fillMaxWidth().height(8.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                        )
+                                    }
+                                    Text(
+                                        text = stringResource(Res.string.article_comments_normal_section),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                                            .padding(top = if (showSectionBreak) 12.dp else 4.dp, bottom = 4.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 },
                 content = {
-                    when {
-                        initialLoading -> item(key = "comments-loading") {
+                    when (bodyState) {
+                        CommentsBodyState.Loading -> item(key = "comments-loading", contentType = "body-loading") {
                             Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                         }
-                        initialError -> item(key = "comments-initial-error") {
-                            Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                        is CommentsBodyState.Error -> item(key = "comments-initial-error", contentType = "body-error") {
+                            Box(Modifier.fillParentMaxSize().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                                 NewsErrorState(
                                     title = stringResource(Res.string.article_comments_load_failed),
-                                    message = refreshError?.error?.newsErrorMessage()
-                                        ?: uiState.commentsError?.newsErrorMessage().orEmpty(),
+                                    message = bodyState.error.newsErrorMessage(),
                                     onRetry = { if (hasCommentsSession) comments.retry() else onLoadComments() },
                                 )
                             }
                         }
-                        showEmpty -> item(key = "comments-empty") {
-                            ArticleCommentsEmptyState(isSortedEmpty, Modifier.fillParentMaxSize())
+                        CommentsBodyState.Empty -> item(key = "comments-empty", contentType = "body-empty") {
+                            ArticleCommentsEmptyState(Modifier.fillParentMaxSize())
                         }
-                        else -> {
+                        CommentsBodyState.Content -> {
                             items(
                                 count = normalCount,
+                                contentType = { "comment" },
                                 key = { index ->
                                     // Keys must stay stable while Paging replaces its snapshot, so
                                     // they are derived from the captured snapshot, never the live one.
@@ -251,16 +281,16 @@ internal fun ArticleCommentsPage(
                                     comments[index]
                                 }
                                 commentsSnapshot.items.getOrNull(index)?.let { thread ->
-                                    ArticleCommentCard(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+                                    ArticleCommentItem(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
                                 }
                             }
                         }
                     }
                 },
                 footer = {
-                    if (hasPresentedComments) {
+                    if (bodyState == CommentsBodyState.Content) {
                         when (val state = appendState) {
-                            LoadState.Loading -> item(key = "comments-append-loading") {
+                            LoadState.Loading -> item(key = "comments-append-loading", contentType = "append-loading") {
                                 Text(
                                     text = stringResource(Res.string.news_loading_more),
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -269,7 +299,7 @@ internal fun ArticleCommentsPage(
                                     textAlign = TextAlign.Center,
                                 )
                             }
-                            is LoadState.Error -> item(key = "comments-append-error") {
+                            is LoadState.Error -> item(key = "comments-append-error", contentType = "append-error") {
                                 CommentsAppendError(state.error.newsErrorMessage(), onRetry = { comments.retry() })
                             }
                             is LoadState.NotLoading -> Unit
@@ -281,8 +311,35 @@ internal fun ArticleCommentsPage(
     }
 }
 
+private sealed interface CommentsBodyState {
+    data object Loading : CommentsBodyState
+    data class Error(val error: DataError) : CommentsBodyState
+    data object Empty : CommentsBodyState
+    data object Content : CommentsBodyState
+}
+
+private fun resolveCommentsBodyState(
+    commentsState: ArticleCommentsUiState,
+    hasPresentedComments: Boolean,
+    refreshState: LoadState,
+    appendState: LoadState,
+): CommentsBodyState = when {
+    hasPresentedComments -> CommentsBodyState.Content
+    commentsState.error != null -> CommentsBodyState.Error(commentsState.error)
+    refreshState is LoadState.Error -> CommentsBodyState.Error(refreshState.error.commentDataError())
+    commentsState.feed == null || commentsState.metadata == null || refreshState is LoadState.Loading ->
+        CommentsBodyState.Loading
+    appendState is LoadState.Error -> CommentsBodyState.Error(appendState.error.commentDataError())
+    refreshState is LoadState.NotLoading && appendState is LoadState.NotLoading && appendState.endOfPaginationReached ->
+        CommentsBodyState.Empty
+    // Empty filtered pages can still be followed by visible comments.
+    else -> CommentsBodyState.Loading
+}
+
+private fun Throwable.commentDataError(): DataError = (this as? DataException)?.error ?: DataError.Unknown
+
 @Composable
-private fun ArticleCommentsEmptyState(isSortedEmpty: Boolean, modifier: Modifier = Modifier) {
+private fun ArticleCommentsEmptyState(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -290,13 +347,13 @@ private fun ArticleCommentsEmptyState(isSortedEmpty: Boolean, modifier: Modifier
     ) {
         Icon(AppIcon.Comment.imageVector, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(
-            text = stringResource(if (isSortedEmpty) Res.string.article_comments_sorted_empty_title else Res.string.article_comments_empty_title),
+            text = stringResource(Res.string.article_comments_empty_title),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = stringResource(if (isSortedEmpty) Res.string.article_comments_sorted_empty_message else Res.string.article_comments_empty_message),
+            text = stringResource(Res.string.article_comments_empty_message),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -330,7 +387,7 @@ private fun CommentsRefreshError(onRetry: () -> Unit) {
 @Composable
 private fun CommentsAppendError(message: String, onRetry: () -> Unit) {
     androidx.compose.material3.Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.medium,
     ) {
