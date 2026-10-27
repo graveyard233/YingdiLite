@@ -19,6 +19,10 @@ kotlin {
         }
         minSdk = 31
 
+        androidResources {
+            enable = true
+        }
+
         withHostTestBuilder {
         }
 
@@ -61,11 +65,29 @@ kotlin {
                 implementation(libs.kotlin.stdlib)
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.foundation)
+                implementation(libs.compose.animation)
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
                 implementation(libs.androidx.navigation3.ui)
                 implementation(libs.kotlinx.serialization.json)
+
+                implementation(libs.androidx.lifecycle.viewmodelNavigation3)
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+                implementation(libs.androidx.lifecycle.viewmodelSavedstate)
+                implementation(libs.androidx.navigationevent.compose)
+
+                implementation(project.dependencies.platform(libs.koin.bom))
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+                implementation(libs.koin.compose.viewmodel)
+                implementation(libs.koin.compose.viewmodel.navigation)
+                implementation(libs.koin.compose.navigation3)
+
                 implementation(project(":core:designsystem"))
+                implementation(project(":core:data"))
+                implementation(project(":core:utils"))
             }
         }
     }

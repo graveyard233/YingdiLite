@@ -1,12 +1,9 @@
 package com.graveyard.yingdilite.navigation.news
 
 import com.graveyard.feature.news.navigation.NewsLayoutMode
+import com.graveyard.yingdilite.navigation.availablePaneIntervals
 
-/** All coordinates are dp relative to the safe content area AFTER the application rail. */
-internal data class PaneBounds(val left: Float, val top: Float, val width: Float, val height: Float) {
-    val right get() = left + width
-    val bottom get() = top + height
-}
+internal typealias PaneBounds = com.graveyard.yingdilite.navigation.PaneBounds
 
 internal data class NewsLayout(
     val mode: NewsLayoutMode,
@@ -45,8 +42,8 @@ internal fun calculateNewsLayout(
 ): NewsLayout {
     val w = (width - navigationWidth).coerceAtLeast(0f)
     val h = height.coerceAtLeast(0f)
-    val columns = partitions(w, verticalHinges.map { (it.left - navigationWidth) to (it.right - navigationWidth) })
-    val band = partitions(h, horizontalHinges.map { it.top to it.bottom }).maxByOrNull { it.second - it.first }
+    val columns = availablePaneIntervals(w, verticalHinges.map { (it.left - navigationWidth) to (it.right - navigationWidth) })
+    val band = availablePaneIntervals(h, horizontalHinges.map { it.top to it.bottom }).maxByOrNull { it.second - it.first }
         ?: (0f to 0f)
     val widest = columns.maxByOrNull { it.second - it.first } ?: (0f to 0f)
     fun single(mode: NewsLayoutMode): NewsLayout {
@@ -98,16 +95,3 @@ internal fun calculateNewsSingleLayout(
     width: Float, height: Float, vertical: List<PaneBounds>, horizontal: List<PaneBounds>,
 ) = calculateNewsLayout(width, height, reading = true, verticalHinges = vertical,
     horizontalHinges = horizontal, forceSingle = true)
-
-private fun partitions(size: Float, exclusions: List<Pair<Float, Float>>): List<Pair<Float, Float>> {
-    var start = 0f
-    val result = mutableListOf<Pair<Float, Float>>()
-    for ((left, right) in exclusions.sortedBy { it.first }) {
-        val a = left.coerceIn(0f, size)
-        val b = right.coerceIn(a, size)
-        if (a > start) result += start to a
-        start = maxOf(start, b)
-    }
-    if (start < size) result += start to size
-    return result
-}

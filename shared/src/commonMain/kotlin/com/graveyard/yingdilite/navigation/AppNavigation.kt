@@ -59,10 +59,9 @@ import com.graveyard.feature.community.navigation.CommunityChildRoute
 import com.graveyard.feature.community.navigation.CommunityRoute
 import com.graveyard.feature.community.ui.CommunityChildScreen
 import com.graveyard.feature.community.ui.CommunityScreen
-import com.graveyard.feature.mine.navigation.MineChildRoute
+import com.graveyard.feature.mine.navigation.MineLoginRoute
+import com.graveyard.feature.mine.navigation.MineAgreementRoute
 import com.graveyard.feature.mine.navigation.MineRoute
-import com.graveyard.feature.mine.ui.MineChildScreen
-import com.graveyard.feature.mine.ui.MineScreen
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.ArticleRepliesRoute
 import com.graveyard.feature.news.navigation.NewsChildRoute
@@ -72,10 +71,12 @@ import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRepliesRouteScr
 import com.graveyard.feature.news.ui.newsList.screen.NewsChildScreen
 import com.graveyard.feature.news.ui.newsList.screen.NewsRouteScreen
 import com.graveyard.yingdilite.navigation.news.APP_ROUTE_KEY
+import com.graveyard.yingdilite.navigation.mine.MineNavEntry
+import com.graveyard.yingdilite.navigation.mine.createMineSceneStrategy
+import com.graveyard.yingdilite.navigation.mine.isMineAgreementPaneChange
 import com.graveyard.yingdilite.navigation.news.APP_TOP_LEVEL_KEY
 import com.graveyard.yingdilite.navigation.news.AppScenePresentation
 import com.graveyard.yingdilite.navigation.news.NewsSceneStrategy
-import com.graveyard.yingdilite.navigation.news.PaneBounds
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
 import com.graveyard.yingdilite.navigation.news.openImages
@@ -100,7 +101,8 @@ private val topLevelKeys = topLevelDestinations.map(TopLevelDestination::key)
 // 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型决定是否装饰场景。
 private val hiddenNavigationRouteTypes = listOf(
     CardsChildRoute::class,
-    MineChildRoute::class,
+    MineLoginRoute::class,
+    MineAgreementRoute::class,
     ArticleRoute::class,
     ArticleRepliesRoute::class,
     ImageGalleryRoute::class,
@@ -126,7 +128,8 @@ fun AppNavigation(
                     subclass(CardsRoute::class, CardsRoute.serializer())
                     subclass(CardsChildRoute::class, CardsChildRoute.serializer())
                     subclass(MineRoute::class, MineRoute.serializer())
-                    subclass(MineChildRoute::class, MineChildRoute.serializer())
+                    subclass(MineLoginRoute::class, MineLoginRoute.serializer())
+                    subclass(MineAgreementRoute::class, MineAgreementRoute.serializer())
                 }
             }
         }
@@ -242,9 +245,19 @@ fun AppNavigation(
                 calculateNewsSingleLayout(maxWidth.value, maxHeight.value, vertical, horizontal)
             }
             val newsStrategy = NewsSceneStrategy(feedLayout, readingLayout)
+            val mineStrategy = createMineSceneStrategy(
+                width = maxWidth.value,
+                height = maxHeight.value,
+                navigationWidth = reservedRailWidth,
+                showsNavigation = isRail,
+                direction = direction,
+                verticalHinges = vertical,
+                horizontalHinges = horizontal,
+            )
             val underlyingEntries = if (gallery != null) entries.dropLast(1) else entries
-            val targetNewsScene = newsStrategy.createScene(underlyingEntries)
-            val basePresentation = targetNewsScene?.let(::scenePresentation) ?: AppScenePresentation(
+            val targetScene = mineStrategy.createScene(underlyingEntries)
+                ?: newsStrategy.createScene(underlyingEntries)
+            val basePresentation = targetScene?.let(::scenePresentation) ?: AppScenePresentation(
                 null,
                 navigationState.currentKey.hasAppNavigation(),
                 setOf(navigationState.currentKey)
@@ -281,10 +294,10 @@ fun AppNavigation(
                     onBack = ::handleBack,
                     modifier = Modifier.fillMaxSize(),
                     sceneDecoratorStrategies = listOf(navigationSceneDecorator),
-                    sceneStrategies = listOf(galleryStrategy, newsStrategy),
+                    sceneStrategies = listOf(galleryStrategy, mineStrategy, newsStrategy),
                     sharedTransitionScope = this,
                     transitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { it },
@@ -295,7 +308,7 @@ fun AppNavigation(
                         )
                     },
                     popTransitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { -it },
@@ -306,7 +319,7 @@ fun AppNavigation(
                         )
                     },
                     predictivePopTransitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { -it },
@@ -377,8 +390,7 @@ private fun AppNavEntry(
         CommunityChildRoute -> CommunityChildScreen(navigator::goBack)
         CardsRoute -> CardsScreen { navigator.navigate(CardsChildRoute) }
         CardsChildRoute -> CardsChildScreen(navigator::goBack)
-        MineRoute -> MineScreen { navigator.navigate(MineChildRoute) }
-        MineChildRoute -> MineChildScreen(navigator::goBack)
+        MineRoute, MineLoginRoute, is MineAgreementRoute -> MineNavEntry(key, navigator, interactive)
         else -> error("Unknown navigation key: $key")
     }
 }

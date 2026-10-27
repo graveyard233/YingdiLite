@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+    <!-- Guest profile -->
+    <string name="mine_title">Me</string>
+    <string name="mine_welcome_title">Welcome to Yingdi</string>
+    <string name="mine_welcome_description">Sign in to your existing account to share and discuss with fellow players.</string>
+    <string name="mine_sign_in">Sign in to Yingdi</string>
+    <string name="mine_preferences">Preferences</string>
+    <string name="mine_application">App</string>
+    <string name="mine_guest_footer">Explore freely. Join whenever you like.</string>
+
+    <!-- Settings -->
+    <string name="mine_setting_appearance">Appearance</string>
+    <string name="mine_follow_system">System default</string>
+    <string name="mine_setting_language">Language</string>
+    <string name="mine_setting_content">Content preferences</string>
+    <string name="mine_setting_content_summary">Subscriptions and browsing</string>
+    <string name="mine_setting_cache">Cache management</string>
+    <string name="mine_setting_cache_summary">Manage local images and temporary files</string>
+    <string name="mine_setting_about">About Yingdi Lite</string>
+    <string name="mine_setting_about_summary">Learn about the app</string>
+
+    <!-- Sign in -->
+    <string name="mine_login_title">Sign in</string>
+    <string name="mine_login_back">Back to guest profile</string>
+    <string name="mine_login_welcome">Welcome back</string>
+    <string name="mine_login_description">Sign in with your existing Yingdi account to continue your journey.</string>
+    <string name="mine_login_phone_method">Phone</string>
+    <string name="mine_login_account_method">Account</string>
+    <string name="mine_login_select_region">Select country or region code</string>
+    <string name="mine_login_region_label">Code</string>
+    <string name="mine_region_mainland_china">Mainland China</string>
+    <string name="mine_region_hong_kong">Hong Kong, China</string>
+    <string name="mine_region_macao">Macao, China</string>
+    <string name="mine_region_taiwan">Taiwan, China</string>
+    <string name="mine_login_phone">Phone number</string>
+    <string name="mine_login_phone_placeholder">Enter your phone number</string>
+    <string name="mine_login_account">Account</string>
+    <string name="mine_login_account_placeholder">Enter your account</string>
+    <string name="mine_login_password">Password</string>
+    <string name="mine_login_password_placeholder">Enter your password</string>
+    <string name="mine_login_help">Trouble signing in?</string>
+
+    <!-- Agreements -->
+    <string name="mine_login_agreement_notice">By signing in, you agree to the following</string>
+    <string name="mine_legal_terms">User Agreement</string>
+    <string name="mine_legal_privacy">Privacy Policy</string>
+    <string name="mine_legal_community">Community Guidelines</string>
+    <string name="mine_legal_children">Children's Personal Information Protection and Notice to Guardians</string>
+    <string name="mine_legal_back">Back to sign in</string>
+</resources>

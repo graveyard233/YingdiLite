@@ -43,4 +43,10 @@ enum class AppIcon(val imageVector: ImageVector) {
     Check(check),
     SortAscending(sortAscending),
     SortDescending(sortDescending),
+    Palette(palette),
+    Language(language),
+    Storage(storage),
+    Info(info),
+    ChevronRight(chevronRight),
+    ExpandMore(expandMore),
 }

@@ -65,6 +65,36 @@ internal val closeIcon = toolbarIcon(
         "5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
 )
 
+internal val palette = toolbarIcon(
+    "Palette",
+    "M12 3C7.03 3 3 7.03 3 12s4.03 9 9 9h1a2 2 0 0 0 2-2c0-.55-.22-1.05-.59-1.41-.36-.36-.59-.86-.59-1.41 0-1.1.9-2 2-2h2.37c2.11 0 3.63-1.71 3.63-3.8C22 6.58 17.52 3 12 3zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4A1.5 1.5 0 1 1 9.5 5a1.5 1.5 0 0 1 0 3zm5 0A1.5 1.5 0 1 1 14.5 5a1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z",
+)
+
+internal val language = toolbarIcon(
+    "Language",
+    "M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17A15.77 15.77 0 0 1 9 11.35 15.7 15.7 0 0 1 6.65 8h-2a17.4 17.4 0 0 0 3 4.5l-5.1 5.01L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7 1.62-4.33L19.12 17h-3.24z",
+)
+
+internal val info = toolbarIcon(
+    "Info",
+    "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
+)
+
+internal val storage = toolbarIcon(
+    "Storage",
+    "M20 6H4c-1.1 0-2 .9-2 2v8c0 1.1 .9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H4V8h16v8zm-14-6h2v2H6zm4 0h8v2h-8z",
+)
+
+internal val chevronRight = toolbarIcon(
+    "ChevronRight",
+    "M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+)
+
+internal val expandMore = toolbarIcon(
+    "ExpandMore",
+    "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z",
+)
+
 private fun toolbarIcon(name: String, path: String): ImageVector =
     ImageVector.Builder(
         name = name,

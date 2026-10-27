@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+    <!-- 未登录用户页 -->
+    <string name="mine_title">我的</string>
+    <string name="mine_welcome_title">欢迎来到营地</string>
+    <string name="mine_welcome_description">登录已有账号，和同好一起分享、讨论。</string>
+    <string name="mine_sign_in">登录营地</string>
+    <string name="mine_preferences">偏好设置</string>
+    <string name="mine_application">应用</string>
+    <string name="mine_guest_footer">自由浏览，随时加入。</string>
+
+    <!-- 设置项 -->
+    <string name="mine_setting_appearance">外观主题</string>
+    <string name="mine_follow_system">跟随系统</string>
+    <string name="mine_setting_language">语言</string>
+    <string name="mine_setting_content">内容偏好</string>
+    <string name="mine_setting_content_summary">订阅与浏览设置</string>
+    <string name="mine_setting_cache">缓存管理</string>
+    <string name="mine_setting_cache_summary">管理本地图片与临时文件</string>
+    <string name="mine_setting_about">关于 Yingdi Lite</string>
+    <string name="mine_setting_about_summary">了解这个应用</string>
+
+    <!-- 登录页 -->
+    <string name="mine_login_title">登录</string>
+    <string name="mine_login_back">返回未登录用户页</string>
+    <string name="mine_login_welcome">欢迎回来</string>
+    <string name="mine_login_description">使用已有营地账号登录，继续你的旅程。</string>
+    <string name="mine_login_phone_method">手机号登录</string>
+    <string name="mine_login_account_method">账号登录</string>
+    <string name="mine_login_select_region">选择区号</string>
+    <string name="mine_login_region_label">区号</string>
+    <string name="mine_region_mainland_china">中国大陆</string>
+    <string name="mine_region_hong_kong">中国香港</string>
+    <string name="mine_region_macao">中国澳门</string>
+    <string name="mine_region_taiwan">中国台湾</string>
+    <string name="mine_login_phone">手机号</string>
+    <string name="mine_login_phone_placeholder">请输入手机号</string>
+    <string name="mine_login_account">账号</string>
+    <string name="mine_login_account_placeholder">请输入账号</string>
+    <string name="mine_login_password">密码</string>
+    <string name="mine_login_password_placeholder">请输入密码</string>
+    <string name="mine_login_help">登录遇到问题？</string>
+
+    <!-- 协议 -->
+    <string name="mine_login_agreement_notice">登录即表示你已阅读并同意</string>
+    <string name="mine_legal_terms">《用户协议》</string>
+    <string name="mine_legal_privacy">《隐私政策》</string>
+    <string name="mine_legal_community">《社区规范》</string>
+    <string name="mine_legal_children">《儿童个人信息保护及监护人须知》</string>
+    <string name="mine_legal_back">返回登录页</string>
+</resources>

@@ -74,7 +74,6 @@ kotlin {
                 implementation(libs.androidx.paging.compose)
                 implementation(libs.kotlinx.serialization.json)
 
-                implementation(libs.androidx.navigation3.ui)
                 implementation(libs.androidx.lifecycle.viewmodelNavigation3)
                 implementation(libs.androidx.lifecycle.runtimeCompose)
                 implementation(libs.androidx.lifecycle.viewmodelSavedstate)
