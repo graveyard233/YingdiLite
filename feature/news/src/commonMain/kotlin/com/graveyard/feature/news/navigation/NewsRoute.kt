@@ -5,6 +5,3 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data object NewsRoute : NavKey
-
-@Serializable
-data object NewsChildRoute : NavKey

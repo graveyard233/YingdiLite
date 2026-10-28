@@ -1,13 +1,7 @@
 package com.graveyard.yingdilite.navigation.news
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
@@ -19,38 +13,24 @@ import com.graveyard.feature.news.navigation.LocalNewsPresentation
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.navigation.NewsRoute
-import com.graveyard.yingdilite.navigation.APP_NAVIGATION_SCENE_KEY
-import kotlin.math.roundToInt
-
-internal const val APP_ROUTE_KEY = "com.graveyard.yingdilite.route"
-internal const val APP_TOP_LEVEL_KEY = "com.graveyard.yingdilite.topLevel"
-internal const val APP_PRESENTATION_KEY = "com.graveyard.yingdilite.presentation"
+import com.graveyard.yingdilite.navigation.APP_PRESENTATION_KEY
+import com.graveyard.yingdilite.navigation.APP_ROUTE_KEY
+import com.graveyard.yingdilite.navigation.APP_TOP_LEVEL_KEY
+import com.graveyard.yingdilite.navigation.AdaptivePaneLayout
+import com.graveyard.yingdilite.navigation.AppScenePresentation
 
 private const val NEWS_READING_WORKSPACE_KEY = "news-reading-workspace"
+// 新闻布局模式仅供本功能的场景切换判断使用，避免应用公共状态依赖 NewsLayoutMode。
+private const val NEWS_LAYOUT_MODE_KEY = "com.graveyard.yingdilite.news.layoutMode"
 
-internal data class AppScenePresentation(
-    val layoutMode: NewsLayoutMode?,
-    val showsApplicationNavigation: Boolean,
-    val visibleEntryKeys: Set<NavKey>,
-    val interactiveEntryKeys: Set<NavKey> = visibleEntryKeys,
-)
-
-internal fun scenePresentation(scene: Scene<NavKey>): AppScenePresentation {
-    (scene.metadata[APP_PRESENTATION_KEY] as? AppScenePresentation)?.let { return it }
-    val keys = scene.entries.mapNotNull { it.metadata[APP_ROUTE_KEY] as? NavKey }.toSet()
-    // Non-news multi-entry scenes must opt in via their own scene presentation.
-    return AppScenePresentation(null,
-        scene.entries.size == 1 && scene.metadata[APP_NAVIGATION_SCENE_KEY] == true, keys)
-}
-
-/** Replacing the supporting pane must not slide the entire reading workspace. */
+/** 宽屏下文章与回复之间只替换辅助 pane，保留阅读区域，跳过整个场景的滑动动画。 */
 internal fun isRepliesPaneChange(initial: Scene<NavKey>, target: Scene<NavKey>): Boolean {
     val from = initial.entries.lastOrNull()?.metadata?.get(APP_ROUTE_KEY)
     val to = target.entries.lastOrNull()?.metadata?.get(APP_ROUTE_KEY)
     val sameArticle = (from is ArticleRepliesRoute && from.article == to) ||
         (to is ArticleRepliesRoute && to.article == from)
-    return sameArticle && scenePresentation(initial).layoutMode in sideBySideModes &&
-        scenePresentation(target).layoutMode in sideBySideModes
+    return sameArticle && (initial.metadata[NEWS_LAYOUT_MODE_KEY] as? NewsLayoutMode) in sideBySideModes &&
+        (target.metadata[NEWS_LAYOUT_MODE_KEY] as? NewsLayoutMode) in sideBySideModes
 }
 
 private val sideBySideModes = setOf(NewsLayoutMode.ReadingDual, NewsLayoutMode.ReadingTriple)
@@ -70,7 +50,7 @@ internal data class NewsSceneStrategy(
             return NewsScene(feedLayout, last, null, emptyList())
         }
         if (route !is ArticleRoute && route !is ArticleRepliesRoute) return null
-        // A contiguous feed/selection segment, never another tab's historic feed.
+        // 只组合当前新闻 Tab 中连续的列表、文章和回复条目，避免混入其他导航流程。
         val feedIndex = entries.indexOfLast { it.metadata[APP_ROUTE_KEY] == NewsRoute }
         if (feedIndex < 0 || entries.subList(feedIndex, entries.size).any {
                 it.metadata[APP_TOP_LEVEL_KEY] != NewsRoute ||
@@ -95,8 +75,8 @@ internal data class NewsScene(
 ) : Scene<NavKey> {
     private val selected = articleEntry?.metadata?.get(APP_ROUTE_KEY) as? ArticleRoute
 
-    // Feed selections share a workspace; linked pushes need distinct scenes for NavDisplay transitions.
-    // Layout changes preserve scene identity across window resizing and pane changes.
+    // 列表选文复用阅读场景，文章内链接则使用独立实例触发导航过渡。
+    // 场景标识不依赖布局模式，窗口缩放时仍能沿用原有身份。
     override val key: Any = repliesEntry?.contentKey ?: when (layout.mode) {
         NewsLayoutMode.Feed -> "news-feed"
         else -> selected?.instanceId?.takeIf { it.isNotBlank() }
@@ -109,10 +89,14 @@ internal data class NewsScene(
         repliesEntry?.let(::add)
     }
     private val presentation = AppScenePresentation(
-        layout.mode, layout.showsNavigation,
-        entries.mapNotNull { it.metadata[APP_ROUTE_KEY] as? NavKey }.toSet(),
+        showsApplicationNavigation = layout.showsNavigation,
+        visibleEntryKeys = entries.mapNotNull { it.metadata[APP_ROUTE_KEY] as? NavKey }.toSet(),
     )
-    override val metadata = mapOf(APP_PRESENTATION_KEY to presentation)
+    // 公共展示状态与新闻专属布局模式分别声明，装饰场景后仍通过 metadata 读取。
+    override val metadata = mapOf(
+        APP_PRESENTATION_KEY to presentation,
+        NEWS_LAYOUT_MODE_KEY to layout.mode,
+    )
     override val content: @Composable () -> Unit = {
         val articleBounds = if (repliesEntry != null) layout.detail else layout.article
         val newsPresentation = NewsPresentation(
@@ -131,21 +115,7 @@ internal data class NewsScene(
                 }
                 if (repliesEntry != null) (layout.comments ?: layout.detail)?.let { add(repliesEntry to it) }
             }
-            Layout(modifier = Modifier.fillMaxSize(), content = {
-                panes.forEach { (entry, _) -> key(entry.contentKey) { Box { entry.Content() } } }
-            }) { measurables, constraints ->
-                val bounds = panes.map { it.second }
-                val placements = measurables.zip(bounds).map { (measurable, pane) ->
-                    val x = (pane.left * density).roundToInt().coerceIn(0, constraints.maxWidth)
-                    val y = (pane.top * density).roundToInt().coerceIn(0, constraints.maxHeight)
-                    val width = (pane.width * density).roundToInt().coerceIn(0, constraints.maxWidth - x)
-                    val height = (pane.height * density).roundToInt().coerceIn(0, constraints.maxHeight - y)
-                    Triple(measurable.measure(Constraints.fixed(width, height)), x, y)
-                }
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    placements.forEach { (placeable, x, y) -> placeable.place(x, y) }
-                }
-            }
+            AdaptivePaneLayout(panes = panes)
         }
     }
 }

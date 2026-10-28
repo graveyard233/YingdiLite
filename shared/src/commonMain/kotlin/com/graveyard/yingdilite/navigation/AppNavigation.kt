@@ -62,20 +62,21 @@ import com.graveyard.feature.community.ui.CommunityScreen
 import com.graveyard.feature.mine.navigation.MineLoginRoute
 import com.graveyard.feature.mine.navigation.MineAgreementRoute
 import com.graveyard.feature.mine.navigation.MineRoute
+import com.graveyard.feature.mine.ui.agreement.screen.MineAgreementScreen
+import com.graveyard.feature.mine.ui.login.screen.MineLoginScreen
+import com.graveyard.feature.mine.ui.mine.screen.MineScreen
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.ArticleRepliesRoute
-import com.graveyard.feature.news.navigation.NewsChildRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRouteScreen
 import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRepliesRouteScreen
-import com.graveyard.feature.news.ui.newsList.screen.NewsChildScreen
 import com.graveyard.feature.news.ui.newsList.screen.NewsRouteScreen
-import com.graveyard.yingdilite.navigation.news.APP_ROUTE_KEY
-import com.graveyard.yingdilite.navigation.mine.MineNavEntry
+import com.graveyard.yingdilite.navigation.mine.closeMineAgreement
 import com.graveyard.yingdilite.navigation.mine.createMineSceneStrategy
 import com.graveyard.yingdilite.navigation.mine.isMineAgreementPaneChange
-import com.graveyard.yingdilite.navigation.news.APP_TOP_LEVEL_KEY
-import com.graveyard.yingdilite.navigation.news.AppScenePresentation
+import com.graveyard.yingdilite.navigation.mine.openMineAgreement
+import com.graveyard.yingdilite.navigation.mine.openMineLogin
+import com.graveyard.yingdilite.navigation.mine.returnToMineProfile
 import com.graveyard.yingdilite.navigation.news.NewsSceneStrategy
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
@@ -84,7 +85,6 @@ import com.graveyard.yingdilite.navigation.news.openLinkedArticle
 import com.graveyard.yingdilite.navigation.news.openReplies
 import com.graveyard.yingdilite.navigation.news.canInteractWithArticle
 import com.graveyard.yingdilite.navigation.news.isRepliesPaneChange
-import com.graveyard.yingdilite.navigation.news.scenePresentation
 import com.graveyard.yingdilite.navigation.news.selectArticle
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -98,7 +98,7 @@ private val topLevelDestinations = listOf(
 
 private val topLevelKeys = topLevelDestinations.map(TopLevelDestination::key)
 
-// 带参路由无法放进 setOf<NavKey> 做相等匹配，因此按类型决定是否装饰场景。
+// 按路由类型决定是否显示应用导航，带参路由无需构造实例进行相等匹配。
 private val hiddenNavigationRouteTypes = listOf(
     CardsChildRoute::class,
     MineLoginRoute::class,
@@ -122,7 +122,6 @@ fun AppNavigation(
                     subclass(ArticleRoute::class, ArticleRoute.serializer())
                     subclass(ArticleRepliesRoute::class, ArticleRepliesRoute.serializer())
                     subclass(ImageGalleryRoute::class, ImageGalleryRoute.serializer())
-                    subclass(NewsChildRoute::class, NewsChildRoute.serializer())
                     subclass(CommunityRoute::class, CommunityRoute.serializer())
                     subclass(CommunityChildRoute::class, CommunityChildRoute.serializer())
                     subclass(CardsRoute::class, CardsRoute.serializer())
@@ -157,9 +156,8 @@ fun AppNavigation(
 
     var targetPresentation by remember { mutableStateOf(
         AppScenePresentation(
-            null,
-            true,
-            setOf(NewsRoute)
+            showsApplicationNavigation = true,
+            visibleEntryKeys = setOf(NewsRoute),
         )
     ) }
     val currentTargetPresentation by rememberUpdatedState(targetPresentation)
@@ -189,18 +187,19 @@ fun AppNavigation(
                         Modifier
                     } else Modifier.safeDrawingPadding()),
             ) {
+                // 离场场景仍可能可见，但不能继续触发页面操作；弹层下的条目也可能暂时不可交互。
+                // 按场景和条目集合共同判断，保留宽屏下多个 pane 同时交互的能力。
                 val interactive = LocalSceneInteractive.current && key in currentTargetPresentation.interactiveEntryKeys
-                CompositionLocalProvider(LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive)) {
-                    AppNavEntry(
-                        key = key,
-                        navigator = navigator,
-                        onShowMessage = { message ->
-                            if (key in currentTargetPresentation.interactiveEntryKeys) {
-                                snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
-                            }
-                        },
-                    )
-                }
+                AppNavEntry(
+                    key = key,
+                    navigator = navigator,
+                    interactive = interactive,
+                    onShowMessage = { message ->
+                        if (key in currentTargetPresentation.interactiveEntryKeys) {
+                            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
+                        }
+                    },
+                )
             }
         }
     }
@@ -258,10 +257,10 @@ fun AppNavigation(
             val targetScene = mineStrategy.createScene(underlyingEntries)
                 ?: newsStrategy.createScene(underlyingEntries)
             val basePresentation = targetScene?.let(::scenePresentation) ?: AppScenePresentation(
-                null,
-                navigationState.currentKey.hasAppNavigation(),
-                setOf(navigationState.currentKey)
+                showsApplicationNavigation = navigationState.currentKey.hasAppNavigation(),
+                visibleEntryKeys = setOf(navigationState.currentKey),
             )
+            // 图片弹层保留下方页面的显示，只把交互权限交给弹层。
             val resolvedPresentation = if (gallery == null) basePresentation else basePresentation.copy(
                 visibleEntryKeys = basePresentation.visibleEntryKeys + gallery,
                 interactiveEntryKeys = setOf(gallery),
@@ -339,21 +338,33 @@ private fun NavKey.hasAppNavigation(): Boolean = this::class !in hiddenNavigatio
 
 private const val NAVIGATION_TRANSITION_DURATION_MILLIS = 300
 
+/**
+ * 统一用应用层传入的交互权限保护页面导航回调；页面内滚动、输入等交互由页面自身管理。
+ * Navigator 中的栈状态校验仍需保留，用于确认动作执行时的导航上下文是否合法。
+ */
 @Composable
 private fun AppNavEntry(
     key: NavKey,
     navigator: Navigator,
+    interactive: Boolean,
     onShowMessage: suspend (String) -> Unit,
 ) {
-    val interactive = LocalNewsPresentation.current.interactive
     when (key) {
-        NewsRoute -> NewsRouteScreen(
-            onShowMessage = onShowMessage,
-            onArticleClick = { articleId, articleTitle, replyNum, likeNum ->
-                navigator.selectArticle(articleId, articleTitle, replyNum, likeNum)
-            },
-        )
-        is ArticleRoute -> {
+        // 新闻内部也使用交互权限控制手势等行为，仅在新闻条目内适配到它的展示状态。
+        // copy 保留 NewsScene 提供的布局信息，其他功能不再依赖新闻的 CompositionLocal。
+        NewsRoute -> CompositionLocalProvider(
+            LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive),
+        ) {
+            NewsRouteScreen(
+                onShowMessage = onShowMessage,
+                onArticleClick = { articleId, articleTitle, replyNum, likeNum ->
+                    if (interactive) navigator.selectArticle(articleId, articleTitle, replyNum, likeNum)
+                },
+            )
+        }
+        is ArticleRoute -> CompositionLocalProvider(
+            LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive),
+        ) {
             ArticleRouteScreen(
                 articleId = key.articleId,
                 articleTitle = key.articleTitle,
@@ -371,26 +382,48 @@ private fun AppNavEntry(
                 },
             )
         }
-        is ArticleRepliesRoute -> ArticleRepliesRouteScreen(
-            commentId = key.commentId,
-            onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
-            onImageClick = { urls, index ->
-                if (interactive) navigator.openImages(urls, index, source = key)
-            },
-        )
+        is ArticleRepliesRoute -> CompositionLocalProvider(
+            LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive),
+        ) {
+            ArticleRepliesRouteScreen(
+                commentId = key.commentId,
+                onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
+                onImageClick = { urls, index ->
+                    if (interactive) navigator.openImages(urls, index, source = key)
+                },
+            )
+        }
         is ImageGalleryRoute -> ImageGalleryPage(
             urls = key.urls,
             initialIndex = key.initialIndex,
             onClose = {
-                if (navigator.state.currentKey == key) navigator.goBack()
+                if (interactive && navigator.state.currentKey == key) navigator.goBack()
             },
         )
-        NewsChildRoute -> NewsChildScreen(navigator::goBack)
-        CommunityRoute -> CommunityScreen { navigator.navigate(CommunityChildRoute) }
-        CommunityChildRoute -> CommunityChildScreen(navigator::goBack)
-        CardsRoute -> CardsScreen { navigator.navigate(CardsChildRoute) }
-        CardsChildRoute -> CardsChildScreen(navigator::goBack)
-        MineRoute, MineLoginRoute, is MineAgreementRoute -> MineNavEntry(key, navigator, interactive)
+        CommunityRoute -> CommunityScreen {
+            if (interactive) navigator.navigate(CommunityChildRoute)
+        }
+        // 单页返回还需核对当前路由，避免连续点击在重组前弹出其他页面；卡片子页同理。
+        CommunityChildRoute -> CommunityChildScreen(
+            onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
+        )
+        CardsRoute -> CardsScreen {
+            if (interactive) navigator.navigate(CardsChildRoute)
+        }
+        CardsChildRoute -> CardsChildScreen(
+            onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
+        )
+        MineRoute -> MineScreen(
+            onOpenLogin = { if (interactive) navigator.openMineLogin() },
+        )
+        MineLoginRoute -> MineLoginScreen(
+            onBack = { if (interactive) navigator.returnToMineProfile() },
+            onOpenAgreement = { if (interactive) navigator.openMineAgreement(it) },
+        )
+        is MineAgreementRoute -> MineAgreementScreen(
+            agreement = key.agreement,
+            onBack = { if (interactive) navigator.closeMineAgreement(key) },
+        )
         else -> error("Unknown navigation key: $key")
     }
 }

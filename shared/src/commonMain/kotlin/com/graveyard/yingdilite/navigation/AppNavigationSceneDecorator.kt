@@ -39,9 +39,8 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneDecoratorStrategy
 import androidx.navigation3.scene.SceneDecoratorStrategyScope
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
-import com.graveyard.yingdilite.navigation.news.scenePresentation
 
-internal const val APP_NAVIGATION_SCENE_KEY = "com.graveyard.yingdilite.navigation.hasNavigation"
+// 只表示当前场景是否允许交互，具体条目还需结合目标展示状态判断。
 internal val LocalSceneInteractive = staticCompositionLocalOf { true }
 
 @Composable
@@ -114,6 +113,7 @@ private data class AppNavigationScene(
         val drawSharedContent =
             animatedContentScope.transition.targetState == EnterExitState.Visible ||
                 !targetHasNavigation()
+        // 入场场景可以响应操作；离场场景保留动画内容，但停止接收页面操作。
         val isTarget = animatedContentScope.transition.targetState == EnterExitState.Visible
         val hasNavigation = scenePresentation(scene).showsApplicationNavigation
         val consumedInsets = when (layoutType) {

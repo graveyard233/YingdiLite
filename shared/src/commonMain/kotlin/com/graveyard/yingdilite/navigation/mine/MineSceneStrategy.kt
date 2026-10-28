@@ -1,12 +1,6 @@
 package com.graveyard.yingdilite.navigation.mine
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -16,13 +10,13 @@ import androidx.navigation3.scene.SceneStrategyScope
 import com.graveyard.feature.mine.navigation.MineAgreementRoute
 import com.graveyard.feature.mine.navigation.MineLoginRoute
 import com.graveyard.feature.mine.navigation.MineRoute
+import com.graveyard.yingdilite.navigation.APP_PRESENTATION_KEY
+import com.graveyard.yingdilite.navigation.APP_ROUTE_KEY
+import com.graveyard.yingdilite.navigation.APP_TOP_LEVEL_KEY
+import com.graveyard.yingdilite.navigation.AdaptivePaneLayout
+import com.graveyard.yingdilite.navigation.AppScenePresentation
 import com.graveyard.yingdilite.navigation.PaneBounds
-import com.graveyard.yingdilite.navigation.news.APP_PRESENTATION_KEY
-import com.graveyard.yingdilite.navigation.news.APP_ROUTE_KEY
-import com.graveyard.yingdilite.navigation.news.APP_TOP_LEVEL_KEY
-import com.graveyard.yingdilite.navigation.news.AppScenePresentation
-import com.graveyard.yingdilite.navigation.news.scenePresentation
-import kotlin.math.roundToInt
+import com.graveyard.yingdilite.navigation.scenePresentation
 
 internal fun createMineSceneStrategy(
     width: Float,
@@ -70,35 +64,17 @@ private data class MineScene(
     val panes: List<Pair<NavEntry<NavKey>, PaneBounds>>,
     override val previousEntries: List<NavEntry<NavKey>>,
 ) : Scene<NavKey> {
-    // The active route, not window size, owns the scene and entry identities.
+    // 路由决定场景身份；窗口尺寸变化只调整 pane 边界，保留原有条目标识。
     override val key: Any = panes.last().first.contentKey
     override val entries = panes.map { it.first }
     override val metadata = mapOf(
         APP_PRESENTATION_KEY to AppScenePresentation(
-            layoutMode = null,
             showsApplicationNavigation = showsNavigation,
             visibleEntryKeys = entries.mapNotNull { it.metadata[APP_ROUTE_KEY] as? NavKey }.toSet(),
         ),
     )
     override val content: @Composable () -> Unit = {
-        Layout(
-            modifier = Modifier.fillMaxSize(),
-            content = {
-                panes.forEach { (entry, _) -> key(entry.contentKey) { Box { entry.Content() } } }
-            },
-        ) { measurables, constraints ->
-            val placements = measurables.zip(panes).map { (measurable, pane) ->
-                val bounds = pane.second
-                val x = (bounds.left * density).roundToInt().coerceIn(0, constraints.maxWidth)
-                val y = (bounds.top * density).roundToInt().coerceIn(0, constraints.maxHeight)
-                val width = (bounds.width * density).roundToInt().coerceIn(0, constraints.maxWidth - x)
-                val height = (bounds.height * density).roundToInt().coerceIn(0, constraints.maxHeight - y)
-                Triple(measurable.measure(Constraints.fixed(width, height)), x, y)
-            }
-            layout(constraints.maxWidth, constraints.maxHeight) {
-                placements.forEach { (placeable, x, y) -> placeable.place(x, y) }
-            }
-        }
+        AdaptivePaneLayout(panes = panes)
     }
 }
 

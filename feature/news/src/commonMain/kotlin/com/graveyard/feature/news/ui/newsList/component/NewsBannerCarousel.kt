@@ -1,6 +1,7 @@
 package com.graveyard.feature.news.ui.newsList.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,7 +35,10 @@ import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.news_banner_page_status
 
 @Composable
-internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
+internal fun NewsBannerCarousel(
+    banners: List<NewsBanner>,
+    onArticleClick: (String, String, String, String) -> Unit,
+) {
     val state = rememberPagerState(pageCount = { banners.size })
     val minimumHeight = (44f * LocalDensity.current.fontScale + 24f).dp
     LaunchedEffect(banners.size) {
@@ -56,7 +60,21 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
                 key = { index -> "${banners[index].adId}-$index" },
             ) { index ->
                 val banner = banners[index]
-                Box(Modifier.fillMaxSize()) {
+                val articleId = bannerArticleId(banner.url)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (articleId != null) {
+                                Modifier.clickable {
+                                    onArticleClick(articleId, banner.title, "0", "0")
+                                }
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .semantics(mergeDescendants = true) {},
+                ) {
                     NewsImage(banner.img, Modifier.fillMaxSize())
                     if (banner.title.isNotBlank()) {
                         Box(
@@ -124,4 +142,20 @@ internal fun NewsBannerCarousel(banners: List<NewsBanner>) {
             }
         }
     }
+}
+
+/** 从 `https://www.iyingdi.com/tz/post/5760166` 这类链接中取出文章 ID。 */
+private fun bannerArticleId(url: String): String? {
+    val trimmed = url.trim()
+    if (!trimmed.startsWith("http://", ignoreCase = true) &&
+        !trimmed.startsWith("https://", ignoreCase = true)
+    ) {
+        return null
+    }
+    val path = trimmed
+        .substringBefore('#')
+        .substringBefore('?')
+        .trimEnd('/')
+    val segment = path.substringAfterLast('/')
+    return segment.takeIf { it.isNotEmpty() && it.all { char -> char.isDigit() } }
 }

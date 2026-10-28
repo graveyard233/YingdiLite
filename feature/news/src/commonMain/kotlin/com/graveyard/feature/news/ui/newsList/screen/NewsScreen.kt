@@ -187,7 +187,10 @@ internal fun NewsPage(
                         contentType = "banners",
                     ) {
                         Column {
-                            NewsBannerCarousel(bannerState.items)
+                            NewsBannerCarousel(
+                                banners = bannerState.items,
+                                onArticleClick = onArticleClick,
+                            )
                             if (bannerState.error != null) {
                                 BannerRefreshFailureNotice(
                                     message = stringResource(Res.string.news_banners_stale),

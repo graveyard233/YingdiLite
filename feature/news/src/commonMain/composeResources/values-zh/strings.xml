@@ -61,7 +61,6 @@
     <string name="article_comments_title">评论</string>
     <string name="article_back_to_detail">返回详情</string>
     <string name="article_more">更多</string>
-    <string name="news_child_title">News 子页面</string>
     <string name="article_close_selection">关闭文章</string>
     <string name="article_deck_copied">卡组代码已复制</string>
     <string name="article_deck_copy_failed">复制失败，请重试</string>
