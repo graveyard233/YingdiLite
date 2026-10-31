@@ -53,6 +53,8 @@ private fun CommentItem.toArticleComment(author: CommentUser, action: Int): Arti
         ),
     )
 
+private val cleartextImageUrl = Regex("(?i)^http://")
+
 /**
  * The `imgs` field packs multiple image URLs separated by a backtick, e.g.
  * `https://a/1.jpeg`https://b/2.gif`. Commas are also accepted as a separator
@@ -62,6 +64,8 @@ private fun splitCommentImageUrls(raw: String): List<String> =
     raw.split(Regex("[`\\s]+|,(?=\\s*https?://)"))
         .map(String::trim)
         .filter(String::isNotEmpty)
+        // Some responses still return cleartext URLs, which Android blocks by default.
+        .map { cleartextImageUrl.replaceFirst(it, "https://") }
 
 private fun sanitizeCommentContent(raw: String): String {
     if (raw.isBlank()) return ""

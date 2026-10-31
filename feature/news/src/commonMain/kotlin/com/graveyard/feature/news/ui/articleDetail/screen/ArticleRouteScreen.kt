@@ -27,11 +27,14 @@ fun ArticleRouteScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val commentsState by viewModel.commentsState.collectAsStateWithLifecycle()
+    val parsedContent = uiState.content
+    val resolvedReplyNum = parsedContent?.replyNum.orEmpty().ifEmpty { replyNum }
+    val resolvedLikeNum = parsedContent?.likeNum.orEmpty().ifEmpty { likeNum }
     ArticlePaneHost(
         uiState = uiState,
         commentsState = commentsState,
-        replyNum = replyNum,
-        likeNum = likeNum,
+        replyNum = resolvedReplyNum,
+        likeNum = resolvedLikeNum,
         presentation = presentation,
         onBack = onBack,
         onMoreClicked = viewModel::onMoreClicked,

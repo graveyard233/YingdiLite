@@ -36,10 +36,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,12 +63,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -79,8 +82,9 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -90,6 +94,7 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -99,10 +104,13 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.feature.mine.model.LegalAgreement
-import com.graveyard.feature.mine.ui.login.viewmodel.MineLoginViewModel
+import com.graveyard.feature.mine.viewmodel.LoginFieldError
+import com.graveyard.feature.mine.viewmodel.LoginMethod
+import com.graveyard.feature.mine.viewmodel.LoginRegion
+import com.graveyard.feature.mine.viewmodel.LoginSubmitResult
+import com.graveyard.feature.mine.viewmodel.MineLoginUiState
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -126,37 +134,71 @@ import yingdilite.feature.mine.generated.resources.mine_login_region_label
 import yingdilite.feature.mine.generated.resources.mine_login_select_region
 import yingdilite.feature.mine.generated.resources.mine_login_title
 import yingdilite.feature.mine.generated.resources.mine_login_welcome
+import yingdilite.feature.mine.generated.resources.mine_login_submitting
+import yingdilite.feature.mine.generated.resources.mine_login_restoring
+import yingdilite.feature.mine.generated.resources.mine_login_phone_required
+import yingdilite.feature.mine.generated.resources.mine_login_phone_digits
+import yingdilite.feature.mine.generated.resources.mine_login_phone_length
+import yingdilite.feature.mine.generated.resources.mine_login_phone_invalid
+import yingdilite.feature.mine.generated.resources.mine_login_account_required
+import yingdilite.feature.mine.generated.resources.mine_login_password_required
 import yingdilite.feature.mine.generated.resources.mine_region_hong_kong
 import yingdilite.feature.mine.generated.resources.mine_region_macao
 import yingdilite.feature.mine.generated.resources.mine_region_mainland_china
 import yingdilite.feature.mine.generated.resources.mine_region_taiwan
 
-private enum class LoginMethod {
-    Phone,
-    Account,
-}
+private val LoginRegion.title: StringResource
+    get() = when (this) {
+        LoginRegion.MainlandChina -> Res.string.mine_region_mainland_china
+        LoginRegion.HongKong -> Res.string.mine_region_hong_kong
+        LoginRegion.Macao -> Res.string.mine_region_macao
+        LoginRegion.Taiwan -> Res.string.mine_region_taiwan
+    }
 
-private enum class LoginRegion(val dialCode: String, val title: StringResource) {
-    MainlandChina("+86", Res.string.mine_region_mainland_china),
-    HongKong("+852", Res.string.mine_region_hong_kong),
-    Macao("+853", Res.string.mine_region_macao),
-    Taiwan("+886", Res.string.mine_region_taiwan),
+@Composable
+private fun loginFieldMessage(error: LoginFieldError, region: LoginRegion): String = when (error) {
+    LoginFieldError.PhoneRequired -> stringResource(Res.string.mine_login_phone_required)
+    LoginFieldError.PhoneDigits -> stringResource(Res.string.mine_login_phone_digits)
+    LoginFieldError.PhoneLength -> stringResource(Res.string.mine_login_phone_length, requireNotNull(region.phoneDigits))
+    LoginFieldError.PhoneInvalid -> stringResource(Res.string.mine_login_phone_invalid)
+    LoginFieldError.AccountRequired -> stringResource(Res.string.mine_login_account_required)
+    LoginFieldError.PasswordRequired -> stringResource(Res.string.mine_login_password_required)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MineLoginScreen(
+internal fun MineLoginScreen(
+    uiState: MineLoginUiState,
     onBack: () -> Unit,
     onOpenAgreement: (LegalAgreement) -> Unit,
+    onMethodSelected: (LoginMethod) -> Unit,
+    onRegionSelected: (LoginRegion) -> Unit,
+    onPhoneChanged: (String) -> Unit,
+    onAccountChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
+    onSubmit: () -> LoginSubmitResult,
     modifier: Modifier = Modifier,
 ) {
-    var method by rememberSaveable { mutableStateOf(LoginMethod.Phone) }
-    var region by rememberSaveable { mutableStateOf(LoginRegion.MainlandChina) }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var account by rememberSaveable { mutableStateOf("") }
-    // Entry-scoped memory survives an agreement visit; the password is never saved to disk.
-    val loginViewModel = viewModel { MineLoginViewModel() }
+    val method = uiState.method
+    val region = uiState.region
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val identityFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val identityErrorMessage = uiState.identityError?.let { loginFieldMessage(it, region) }
+    val passwordErrorMessage = uiState.passwordError?.let { loginFieldMessage(it, region) }
+
+    fun submit() {
+        when (onSubmit()) {
+            LoginSubmitResult.Accepted -> {
+                focusManager.clearFocus()
+                keyboardController?.hide()
+            }
+            LoginSubmitResult.IdentityInvalid -> identityFocusRequester.requestFocus()
+            LoginSubmitResult.PasswordInvalid -> passwordFocusRequester.requestFocus()
+            LoginSubmitResult.Unavailable -> Unit
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -204,7 +246,8 @@ fun MineLoginScreen(
 
                 LoginMethodSwitcher(
                     selectedMethod = method,
-                    onMethodSelected = { method = it },
+                    onMethodSelected = onMethodSelected,
+                    enabled = uiState.enabled,
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -215,52 +258,88 @@ fun MineLoginScreen(
                         ) {
                             LoginRegionSelector(
                                 selectedRegion = region,
-                                onRegionSelected = { region = it },
+                                onRegionSelected = onRegionSelected,
+                                enabled = uiState.enabled,
                             )
                             OutlinedTextField(
-                                value = phone,
-                                onValueChange = { phone = it },
-                                modifier = Modifier.weight(1f),
+                                value = uiState.phone,
+                                onValueChange = onPhoneChanged,
+                                enabled = uiState.enabled,
+                                isError = identityErrorMessage != null,
+                                supportingText = if (identityErrorMessage != null) {
+                                    { Text(identityErrorMessage) }
+                                } else null,
+                                modifier = Modifier.weight(1f).focusRequester(identityFocusRequester),
                                 label = { Text(stringResource(Res.string.mine_login_phone)) },
                                 placeholder = { Text(stringResource(Res.string.mine_login_phone_placeholder)) },
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next,
+                                ),
+                                keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
                                 shape = MaterialTheme.shapes.large,
                             )
                         }
                     } else {
                         OutlinedTextField(
-                            value = account,
-                            onValueChange = { account = it },
-                            modifier = Modifier.fillMaxWidth(),
+                            value = uiState.account,
+                            onValueChange = onAccountChanged,
+                            enabled = uiState.enabled,
+                            isError = identityErrorMessage != null,
+                            supportingText = if (identityErrorMessage != null) {
+                                { Text(identityErrorMessage) }
+                            } else null,
+                            modifier = Modifier.fillMaxWidth().focusRequester(identityFocusRequester),
                             label = { Text(stringResource(Res.string.mine_login_account)) },
                             placeholder = { Text(stringResource(Res.string.mine_login_account_placeholder)) },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text, imeAction = ImeAction.Next,
+                            ),
+                            keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
                             shape = MaterialTheme.shapes.large,
                         )
                     }
 
                     OutlinedTextField(
-                        value = loginViewModel.password,
-                        onValueChange = { loginViewModel.password = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = uiState.password,
+                        onValueChange = onPasswordChanged,
+                        enabled = uiState.enabled,
+                        isError = passwordErrorMessage != null,
+                        supportingText = if (passwordErrorMessage != null) {
+                            { Text(passwordErrorMessage) }
+                        } else null,
+                        modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
                         label = { Text(stringResource(Res.string.mine_login_password)) },
                         placeholder = { Text(stringResource(Res.string.mine_login_password_placeholder)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password, imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { submit() }),
                         shape = MaterialTheme.shapes.large,
                     )
 
                     Button(
-                        onClick = {
-                            // TODO: Connect the selected login method to the authentication service.
-                        },
+                        onClick = ::submit,
+                        enabled = uiState.enabled,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shape = MaterialTheme.shapes.extraLarge,
                     ) {
-                        Text(stringResource(Res.string.mine_login_title))
+                        if (uiState.isSubmitting || uiState.isRestoring) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        }
+                        Text(
+                            text = stringResource(
+                                when {
+                                    uiState.isSubmitting -> Res.string.mine_login_submitting
+                                    uiState.isRestoring -> Res.string.mine_login_restoring
+                                    else -> Res.string.mine_login_title
+                                },
+                            ),
+                            modifier = Modifier.padding(start = if (uiState.isSubmitting || uiState.isRestoring) 8.dp else 0.dp),
+                        )
                     }
 
                     TextButton(
@@ -288,10 +367,14 @@ fun MineLoginScreen(
 private fun LoginRegionSelector(
     selectedRegion: LoginRegion,
     onRegionSelected: (LoginRegion) -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(enabled) {
+        if (!enabled) expanded = false
+    }
     val colors = MaterialTheme.colorScheme
     val highlighted = expanded || focused
     val regionName = stringResource(selectedRegion.title)
@@ -310,6 +393,7 @@ private fun LoginRegionSelector(
     ) {
         OutlinedButton(
             onClick = { expanded = !expanded },
+            enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
@@ -358,7 +442,7 @@ private fun LoginRegionSelector(
             color = if (highlighted) colors.primary else colors.onSurfaceVariant,
         )
         DropdownMenu(
-            expanded = expanded,
+            expanded = expanded && enabled,
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(232.dp),
             offset = DpOffset(x = 0.dp, y = 4.dp),
@@ -453,6 +537,7 @@ private fun LoginAgreements(onOpenAgreement: (LegalAgreement) -> Unit) {
 private fun LoginMethodSwitcher(
     selectedMethod: LoginMethod,
     onMethodSelected: (LoginMethod) -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -507,7 +592,8 @@ private fun LoginMethodSwitcher(
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
                 .selectableGroup()
-                .pointerInput(direction) {
+                .pointerInput(direction, enabled) {
+                    if (!enabled) return@pointerInput
                     val flingThreshold = 500.dp.toPx()
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -589,6 +675,7 @@ private fun LoginMethodSwitcher(
                         .clip(CircleShape)
                         .selectable(
                             selected = selected,
+                            enabled = enabled,
                             interactionSource = interactionSource,
                             // Switching uses the moving capsule; only reselecting shows a ripple.
                             indication = if (selected && !switchState.isDragging) {

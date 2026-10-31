@@ -8,6 +8,36 @@
     <string name="mine_preferences">偏好设置</string>
     <string name="mine_application">应用</string>
     <string name="mine_guest_footer">自由浏览，随时加入。</string>
+    <string name="mine_content">我的内容</string>
+    <string name="mine_my_posts">我的帖子</string>
+    <string name="mine_my_posts_summary">%1$d 篇内容</string>
+    <string name="mine_my_favorites">我的收藏</string>
+    <string name="mine_my_favorites_summary">收藏的文章与讨论</string>
+    <string name="mine_my_history">浏览历史</string>
+    <string name="mine_my_history_summary">最近看过的内容</string>
+    <string name="mine_following">关注</string>
+    <string name="mine_followers">粉丝</string>
+    <string name="mine_likes">获赞</string>
+    <string name="mine_profile_unknown">营地用户</string>
+    <string name="mine_profile_footer">和同好一起，发现更多精彩</string>
+    <string name="mine_notifications">通知</string>
+    <string name="mine_profile_avatar">%1$s的头像</string>
+    <string name="mine_profile_edit">编辑个人资料</string>
+    <string name="mine_profile_id">营地 ID %1$d</string>
+    <string name="mine_profile_location">%1$s</string>
+    <string name="mine_no_bio">还没有填写个人简介</string>
+    <string name="mine_experience">%1$d 经验值</string>
+    <string name="mine_experience_label">经验值</string>
+    <string name="mine_data_unavailable">--</string>
+    <string name="mine_level_progress">距下一级还差 %1$d 经验</string>
+    <string name="mine_level_max">已达最高等级</string>
+    <string name="mine_balance">营火</string>
+    <string name="mine_logout">退出登录</string>
+    <string name="mine_logout_title">确认退出登录？</string>
+    <string name="mine_logout_message">此设备上保存的登录凭证将被清除。</string>
+    <string name="mine_logout_confirm">退出登录</string>
+    <string name="mine_logout_cancel">取消</string>
+    <string name="mine_logout_failed">退出登录失败，请重试。</string>
 
     <!-- 设置项 -->
     <string name="mine_setting_appearance">外观主题</string>
@@ -40,6 +70,21 @@
     <string name="mine_login_password">密码</string>
     <string name="mine_login_password_placeholder">请输入密码</string>
     <string name="mine_login_help">登录遇到问题？</string>
+    <string name="mine_login_submitting">登录中…</string>
+    <string name="mine_login_restoring">正在恢复登录状态…</string>
+    <string name="mine_login_phone_required">请输入手机号</string>
+    <string name="mine_login_phone_digits">手机号只能包含数字</string>
+    <string name="mine_login_phone_length">请输入 %1$d 位手机号</string>
+    <string name="mine_login_phone_invalid">请输入正确的手机号</string>
+    <string name="mine_login_account_required">请输入账号</string>
+    <string name="mine_login_password_required">请输入密码</string>
+    <string name="mine_login_error_network">无法连接网络，请检查网络后重试。</string>
+    <string name="mine_login_error_timeout">登录请求超时，请重试。</string>
+    <string name="mine_login_error_http">登录服务暂不可用（HTTP %1$d），请重试。</string>
+    <string name="mine_login_error_parsing">登录响应异常，请重试。</string>
+    <string name="mine_login_error_user_not_found">账号不存在，请检查账号或手机号。</string>
+    <string name="mine_login_error_signature">登录请求校验失败，请重试。</string>
+    <string name="mine_login_error_failed">登录失败，请重试。</string>
 
     <!-- 协议 -->
     <string name="mine_login_agreement_notice">登录即表示你已阅读并同意</string>

@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.graveyard.core.data.auth.AuthSession
+import com.graveyard.core.data.auth.AuthUser
 import com.graveyard.core.model.news.TagInfo
 import com.graveyard.core.utils.logging.Logger
 import kotlinx.coroutines.CancellationException
@@ -63,6 +65,52 @@ internal class DefaultUserSettings(
         writeMutex.withLock {
             cached.value = dataStore.edit { preferences ->
                 preferences[LANGUAGE_KEY] = value
+            }
+        }
+    }
+
+    override val session: Flow<AuthSession?> = dataStore.data.map { preferences ->
+        val loginToken = preferences[LOGIN_TOKEN_KEY]
+        val refreshToken = preferences[REFRESH_TOKEN_KEY]
+        val userId = preferences[USER_ID_KEY]
+        if (loginToken.isNullOrBlank() || refreshToken.isNullOrBlank() || userId == null) {
+            null
+        } else {
+            AuthSession(loginToken, refreshToken, userId, preferences.getJsonOrNull(USER_PROFILE_KEY, json))
+        }
+    }.distinctUntilChanged()
+
+    override suspend fun saveSession(session: AuthSession) {
+        writeMutex.withLock {
+            cached.value = dataStore.edit { preferences ->
+                preferences[LOGIN_TOKEN_KEY] = session.loginToken
+                preferences[REFRESH_TOKEN_KEY] = session.refreshToken
+                preferences[USER_ID_KEY] = session.userId
+                if (session.user == null) preferences.remove(USER_PROFILE_KEY)
+                else preferences.setJson(USER_PROFILE_KEY, session.user, json)
+            }
+        }
+    }
+
+    override suspend fun updateLoginToken(loginToken: String) {
+        writeMutex.withLock {
+            cached.value = dataStore.edit { it[LOGIN_TOKEN_KEY] = loginToken }
+        }
+    }
+
+    override suspend fun saveUserProfile(user: AuthUser) {
+        writeMutex.withLock {
+            cached.value = dataStore.edit { it.setJson(USER_PROFILE_KEY, user, json) }
+        }
+    }
+
+    override suspend fun clearSession() {
+        writeMutex.withLock {
+            cached.value = dataStore.edit { preferences ->
+                preferences.remove(LOGIN_TOKEN_KEY)
+                preferences.remove(REFRESH_TOKEN_KEY)
+                preferences.remove(USER_ID_KEY)
+                preferences.remove(USER_PROFILE_KEY)
             }
         }
     }
@@ -190,6 +238,10 @@ internal class DefaultUserSettings(
         const val TAG = "UserSettings"
         const val DEFAULT_LANGUAGE = "zh"
         val LANGUAGE_KEY = stringPreferencesKey("language")
+        val LOGIN_TOKEN_KEY = stringPreferencesKey("login_token")
+        val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
+        val USER_ID_KEY = longPreferencesKey("user_id")
+        val USER_PROFILE_KEY = stringPreferencesKey("auth_user_profile")
         val TAGS_USER_KEY = stringPreferencesKey("tags_user_tags")
         val TAGS_ALL_KEY = stringPreferencesKey("tags_all_tags")
         val TAGS_REMOTE_KEY = booleanPreferencesKey("tags_catalog_remote")

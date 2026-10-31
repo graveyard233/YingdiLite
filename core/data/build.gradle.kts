@@ -84,6 +84,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
                 implementation(project.dependencies.platform(libs.ktor.bom))
                 implementation("io.ktor:ktor-client-mock")
             }

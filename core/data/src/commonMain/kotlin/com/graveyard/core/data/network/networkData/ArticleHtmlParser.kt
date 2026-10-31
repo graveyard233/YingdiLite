@@ -5,24 +5,29 @@ import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
-internal fun parseArticleAuthor(document: Document, json: Json): NewsAuthor {
-    parseArticleAuthorFromDom(document)?.let { return it }
+/** Page metadata parsed from the article detail HTML. */
+internal data class ArticlePageMeta(
+    val author: NewsAuthor = NewsAuthor(),
+    val replyNum: String = "",
+    val likeNum: String = "",
+)
 
-    for (script in document.select("script")) {
-        val source = script.data()
-        if (!source.contains("__NUXT__")) continue
-        val author = try {
-            NuxtAuthorReader(source, json).read()
-        } catch (_: IllegalArgumentException) {
-            null
-        }
-        if (author != null) return author
+/** DOM first, then the __NUXT__ payload; page scripts are never evaluated. */
+internal fun parseArticlePage(document: Document, json: Json): ArticlePageMeta {
+    val author = parseAuthorFromDom(document)
+    val counters = parseCountersFromDom(document)
+    if (author != null && counters.replyNum.isNotEmpty() && counters.likeNum.isNotEmpty()) {
+        return ArticlePageMeta(author, counters.replyNum, counters.likeNum)
     }
-
-    return NewsAuthor()
+    val nuxt = readNuxtPage(document, json)
+    return ArticlePageMeta(
+        author = author ?: nuxt?.author ?: NewsAuthor(),
+        replyNum = counters.replyNum.ifEmpty { nuxt?.replyNum.orEmpty() },
+        likeNum = counters.likeNum.ifEmpty { nuxt?.likeNum.orEmpty() },
+    )
 }
 
-private fun parseArticleAuthorFromDom(document: Document): NewsAuthor? {
+private fun parseAuthorFromDom(document: Document): NewsAuthor? {
     val area = document.selectFirst(".rich-detail .user-title-area") ?: return null
     val username = area.selectFirst(".user-info .name")?.text()?.trim().orEmpty()
     val head = area.selectFirst(".user-head img.avatar")?.absUrl("src")?.trim().orEmpty()
@@ -33,12 +38,59 @@ private fun parseArticleAuthorFromDom(document: Document): NewsAuthor? {
     return NewsAuthor(username = username, head = head, level = level)
 }
 
-/** Reads only data[0].detail.author; page scripts are never evaluated. */
-private class NuxtAuthorReader(source: String, private val json: Json) {
+private data class PageCounters(
+    val replyNum: String = "",
+    val likeNum: String = "",
+)
+
+private fun parseCountersFromDom(document: Document): PageCounters {
+    val area = document.selectFirst("#comments-area-id")
+        ?: document.selectFirst(".write-area")
+        ?: return PageCounters()
+    var replyNum = ""
+    var likeNum = ""
+    for (icon in area.select(".icon")) {
+        val iconName = icon.selectFirst("use")
+            ?.let { it.attr("xlink:href").ifEmpty { it.attr("href") } }
+            .orEmpty()
+        val value = icon.selectFirst("em")?.text()?.trim()
+            ?.toLongOrNull()?.takeIf { it >= 0 }?.toString()
+            ?: continue
+        when {
+            likeNum.isEmpty() && iconName.contains("icon-fire") -> likeNum = value
+            replyNum.isEmpty() && iconName.contains("icon-comment") -> replyNum = value
+        }
+    }
+    if (likeNum.isEmpty() && replyNum.isEmpty()) {
+        // `use` 的命名空间属性在 Ksoup 上取不到时的结构兜底。
+        replyNum = area.selectFirst("""a[href="#viewComments"] em""")?.text()?.trim()
+            ?.toLongOrNull()?.toString().orEmpty()
+        likeNum = area.select("span.icon em").firstOrNull()?.text()?.trim()
+            ?.toLongOrNull()?.toString().orEmpty()
+    }
+    return PageCounters(replyNum = replyNum, likeNum = likeNum)
+}
+
+private fun readNuxtPage(document: Document, json: Json): ArticlePageMeta? {
+    for (script in document.select("script")) {
+        val source = script.data()
+        if (!source.contains("__NUXT__")) continue
+        val page = try {
+            NuxtPageReader(source, json).read()
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+        if (page != null) return page
+    }
+    return null
+}
+
+/** Reads the fields this page needs from data[0].detail; page scripts are never evaluated. */
+private class NuxtPageReader(source: String, private val json: Json) {
     private val tokens = tokenize(source)
     private val bindings = mutableMapOf<String, String>()
 
-    fun read(): NewsAuthor? {
+    fun read(): ArticlePageMeta? {
         val assignment = tokens.indices.firstOrNull {
             tokens[it] == "window" && tokens.getOrNull(it + 1) == "." &&
                 tokens.getOrNull(it + 2) == "__NUXT__" && tokens.getOrNull(it + 3) == "="
@@ -64,7 +116,16 @@ private class NuxtAuthorReader(source: String, private val json: Json) {
         val data = member(root, "data") ?: return null
         if (tokens.getOrNull(data.first) != "[") return null
         val detail = member(data.first + 1, "detail") ?: return null
-        val author = member(detail.first, "author") ?: return null
+        val post = member(detail.first, "post") ?: member(data.first + 1, "post")
+        val replyNum = post?.let { readCount(it, "reply_num") }.orEmpty()
+        val likeNum = post?.let { readCount(it, "like_num") }.orEmpty()
+        val author = readAuthor(detail.first) ?: NewsAuthor()
+        if (replyNum.isEmpty() && likeNum.isEmpty() && author == NewsAuthor()) return null
+        return ArticlePageMeta(author = author, replyNum = replyNum, likeNum = likeNum)
+    }
+
+    private fun readAuthor(detailStart: Int): NewsAuthor? {
+        val author = member(detailStart, "author") ?: return null
 
         fun value(name: String): String? {
             val range = member(author.first, name) ?: return null
@@ -81,6 +142,13 @@ private class NuxtAuthorReader(source: String, private val json: Json) {
         val badgeJson = text("badge_json") ?: return null
         if (id == 0L && username.isBlank() && head.isBlank()) return null
         return NewsAuthor(id = id, username = username, head = head, credits = credits, badgeJson = badgeJson)
+    }
+
+    private fun readCount(container: IntRange, name: String): String? {
+        val range = member(container.first, name) ?: return null
+        if (range.first != range.last) return null
+        val token = tokens[range.first]
+        return (bindings[token] ?: token).toLongOrNull()?.takeIf { it >= 0 }?.toString()
     }
 
     private fun readBindings(parameters: Int, parametersEnd: Int, arguments: Int) {

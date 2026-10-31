@@ -8,6 +8,36 @@
     <string name="mine_preferences">Preferences</string>
     <string name="mine_application">App</string>
     <string name="mine_guest_footer">Explore freely. Join whenever you like.</string>
+    <string name="mine_content">My content</string>
+    <string name="mine_my_posts">Posts</string>
+    <string name="mine_my_posts_summary">%1$d pieces of content</string>
+    <string name="mine_my_favorites">Favorites</string>
+    <string name="mine_my_favorites_summary">Saved articles and discussions</string>
+    <string name="mine_my_history">History</string>
+    <string name="mine_my_history_summary">Recently viewed content</string>
+    <string name="mine_following">Following</string>
+    <string name="mine_followers">Followers</string>
+    <string name="mine_likes">Likes</string>
+    <string name="mine_profile_unknown">Yingdi user</string>
+    <string name="mine_profile_footer">Discover more with fellow players</string>
+    <string name="mine_notifications">Notifications</string>
+    <string name="mine_profile_avatar">%1$s avatar</string>
+    <string name="mine_profile_edit">Edit profile</string>
+    <string name="mine_profile_id">Yingdi ID %1$d</string>
+    <string name="mine_profile_location">%1$s</string>
+    <string name="mine_no_bio">No profile introduction yet</string>
+    <string name="mine_experience">%1$d experience</string>
+    <string name="mine_experience_label">Experience</string>
+    <string name="mine_data_unavailable">--</string>
+    <string name="mine_level_progress">%1$d to next level</string>
+    <string name="mine_level_max">Maximum level</string>
+    <string name="mine_balance">Campfire</string>
+    <string name="mine_logout">Sign out</string>
+    <string name="mine_logout_title">Sign out?</string>
+    <string name="mine_logout_message">Your sign-in details will be removed from this device.</string>
+    <string name="mine_logout_confirm">Sign out</string>
+    <string name="mine_logout_cancel">Cancel</string>
+    <string name="mine_logout_failed">Could not sign out. Please try again.</string>
 
     <!-- Settings -->
     <string name="mine_setting_appearance">Appearance</string>
@@ -40,6 +70,21 @@
     <string name="mine_login_password">Password</string>
     <string name="mine_login_password_placeholder">Enter your password</string>
     <string name="mine_login_help">Trouble signing in?</string>
+    <string name="mine_login_submitting">Signing in…</string>
+    <string name="mine_login_restoring">Restoring session…</string>
+    <string name="mine_login_phone_required">Enter your phone number</string>
+    <string name="mine_login_phone_digits">Use digits only for your phone number</string>
+    <string name="mine_login_phone_length">Enter a %1$d-digit phone number</string>
+    <string name="mine_login_phone_invalid">Enter a valid phone number</string>
+    <string name="mine_login_account_required">Enter your account</string>
+    <string name="mine_login_password_required">Enter your password</string>
+    <string name="mine_login_error_network">Cannot connect. Check your network and try again.</string>
+    <string name="mine_login_error_timeout">Sign-in timed out. Please try again.</string>
+    <string name="mine_login_error_http">Sign-in service unavailable (HTTP %1$d). Please try again.</string>
+    <string name="mine_login_error_parsing">Unexpected sign-in response. Please try again.</string>
+    <string name="mine_login_error_user_not_found">Account not found. Check your account or phone number.</string>
+    <string name="mine_login_error_signature">Sign-in request verification failed. Please try again.</string>
+    <string name="mine_login_error_failed">Could not sign in. Please try again.</string>
 
     <!-- Agreements -->
     <string name="mine_login_agreement_notice">By signing in, you agree to the following</string>

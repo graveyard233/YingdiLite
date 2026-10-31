@@ -7,4 +7,6 @@ data class ArticleContent(
     val html: String,
     val baseUrl: String,
     val newsAuthor: NewsAuthor = NewsAuthor(),
+    val replyNum: String = "",
+    val likeNum: String = "",
 )

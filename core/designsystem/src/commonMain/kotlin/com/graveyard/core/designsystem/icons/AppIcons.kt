@@ -49,4 +49,5 @@ enum class AppIcon(val imageVector: ImageVector) {
     Info(info),
     ChevronRight(chevronRight),
     ExpandMore(expandMore),
+    Logout(logoutIcon),
 }

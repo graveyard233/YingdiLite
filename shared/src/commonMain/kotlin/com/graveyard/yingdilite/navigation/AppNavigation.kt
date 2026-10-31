@@ -27,6 +27,7 @@ import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,8 @@ import com.graveyard.core.designsystem.media.imageGalleryDialogProperties
 import com.graveyard.core.designsystem.navigation.Navigator
 import com.graveyard.core.designsystem.navigation.rememberNavigationState
 import com.graveyard.core.designsystem.navigation.toEntries
+import com.graveyard.core.data.auth.AuthState
+import com.graveyard.core.data.repository.AuthRepository
 import com.graveyard.feature.cards.navigation.CardsChildRoute
 import com.graveyard.feature.cards.navigation.CardsRoute
 import com.graveyard.feature.cards.ui.CardsChildScreen
@@ -63,8 +66,9 @@ import com.graveyard.feature.mine.navigation.MineLoginRoute
 import com.graveyard.feature.mine.navigation.MineAgreementRoute
 import com.graveyard.feature.mine.navigation.MineRoute
 import com.graveyard.feature.mine.ui.agreement.screen.MineAgreementScreen
-import com.graveyard.feature.mine.ui.login.screen.MineLoginScreen
-import com.graveyard.feature.mine.ui.mine.screen.MineScreen
+import com.graveyard.feature.mine.ui.login.screen.MineLoginRouteScreen
+import com.graveyard.feature.mine.ui.effect.MineLoginFeedback
+import com.graveyard.feature.mine.ui.mine.screen.MineRouteScreen
 import com.graveyard.feature.news.navigation.ArticleRoute
 import com.graveyard.feature.news.navigation.ArticleRepliesRoute
 import com.graveyard.feature.news.navigation.NewsRoute
@@ -77,6 +81,8 @@ import com.graveyard.yingdilite.navigation.mine.isMineAgreementPaneChange
 import com.graveyard.yingdilite.navigation.mine.openMineAgreement
 import com.graveyard.yingdilite.navigation.mine.openMineLogin
 import com.graveyard.yingdilite.navigation.mine.returnToMineProfile
+import com.graveyard.yingdilite.navigation.mine.finishMineLogin
+import org.koin.compose.koinInject
 import com.graveyard.yingdilite.navigation.news.NewsSceneStrategy
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
 import com.graveyard.yingdilite.navigation.news.calculateNewsSingleLayout
@@ -142,6 +148,12 @@ fun AppNavigation(
     val adaptiveInfo = currentWindowAdaptiveInfo()
     val layoutType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptiveInfo)
     val navigator = remember(navigationState) { Navigator(navigationState) }
+    val authRepository = koinInject<AuthRepository>()
+    val authState by authRepository.state.collectAsState()
+    val mineStack = navigationState.subStacks.getValue(MineRoute).toList()
+    LaunchedEffect(authState is AuthState.Authenticated, mineStack) {
+        if (authRepository.state.value is AuthState.Authenticated) navigator.finishMineLogin()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val galleryStrategy = remember { DialogSceneStrategy<NavKey>() }
     val gallery = navigationState.currentKey as? ImageGalleryRoute
@@ -183,7 +195,7 @@ fun AppNavigation(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (key == NewsRoute || key is ArticleRoute || key is ArticleRepliesRoute || key is ImageGalleryRoute) {
+                    .then(if (key == NewsRoute || key == MineRoute || key is ArticleRoute || key is ArticleRepliesRoute || key is ImageGalleryRoute) {
                         Modifier
                     } else Modifier.safeDrawingPadding()),
             ) {
@@ -193,6 +205,7 @@ fun AppNavigation(
                 AppNavEntry(
                     key = key,
                     navigator = navigator,
+                    authRepository = authRepository,
                     interactive = interactive,
                     onShowMessage = { message ->
                         if (key in currentTargetPresentation.interactiveEntryKeys) {
@@ -269,6 +282,13 @@ fun AppNavigation(
             LaunchedEffect(resolvedPresentation.interactiveEntryKeys) {
                 snackbarHostState.currentSnackbarData?.dismiss()
             }
+            MineLoginFeedback(
+                active = navigationState.currentTopLevelKey == MineRoute &&
+                    resolvedPresentation.interactiveEntryKeys.any {
+                        it == MineRoute || it == MineLoginRoute || it is MineAgreementRoute
+                    },
+                onShowMessage = { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short) },
+            )
             SharedTransitionLayout(Modifier.fillMaxSize()) {
                 val navigationSceneDecorator = rememberAppNavigationSceneDecoratorStrategy(
                     layoutType = layoutType,
@@ -346,6 +366,7 @@ private const val NAVIGATION_TRANSITION_DURATION_MILLIS = 300
 private fun AppNavEntry(
     key: NavKey,
     navigator: Navigator,
+    authRepository: AuthRepository,
     interactive: Boolean,
     onShowMessage: suspend (String) -> Unit,
 ) {
@@ -413,10 +434,12 @@ private fun AppNavEntry(
         CardsChildRoute -> CardsChildScreen(
             onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
         )
-        MineRoute -> MineScreen(
-            onOpenLogin = { if (interactive) navigator.openMineLogin() },
+        MineRoute -> MineRouteScreen(
+            onOpenLogin = { if (interactive) navigator.openMineLogin(authRepository.state.value) },
+            onShowMessage = onShowMessage,
         )
-        MineLoginRoute -> MineLoginScreen(
+        MineLoginRoute -> MineLoginRouteScreen(
+            interactive = interactive,
             onBack = { if (interactive) navigator.returnToMineProfile() },
             onOpenAgreement = { if (interactive) navigator.openMineAgreement(it) },
         )

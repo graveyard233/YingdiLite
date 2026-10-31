@@ -95,6 +95,11 @@ internal val expandMore = toolbarIcon(
     "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z",
 )
 
+internal val logoutIcon = toolbarIcon(
+    "Logout",
+    "M10 17l5-5-5-5v3H3v4h7v3z M19 3H5c-1.1 0-2 .9-2 2v3h2V5h14v14H5v-3H3v3c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z",
+)
+
 private fun toolbarIcon(name: String, path: String): ImageVector =
     ImageVector.Builder(
         name = name,

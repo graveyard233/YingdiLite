@@ -1,15 +1,22 @@
 package com.graveyard.yingdilite.navigation.mine
 
 import com.graveyard.core.designsystem.navigation.Navigator
+import com.graveyard.core.data.auth.AuthState
 import com.graveyard.feature.mine.model.LegalAgreement
 import com.graveyard.feature.mine.navigation.MineAgreementRoute
 import com.graveyard.feature.mine.navigation.MineLoginRoute
 import com.graveyard.feature.mine.navigation.MineRoute
 
 /** Keep feature-specific back-stack policy in the assembly layer, as in NewsNavigator. */
-internal fun Navigator.openMineLogin() {
+internal fun Navigator.openMineLogin(authState: AuthState) {
+    if (authState != AuthState.Guest) return
     if (state.currentTopLevelKey != MineRoute || state.currentKey != MineRoute) return
     navigate(MineLoginRoute)
+}
+
+/** Auth completion also cleans an inactive/restored Mine stack without switching tabs. */
+internal fun Navigator.finishMineLogin() {
+    state.subStacks[MineRoute]?.removeAll { it == MineLoginRoute || it is MineAgreementRoute }
 }
 
 private fun Navigator.canInteractWithMineLogin(): Boolean =

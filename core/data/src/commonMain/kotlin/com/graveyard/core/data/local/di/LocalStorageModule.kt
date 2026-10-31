@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import com.graveyard.core.data.local.preferences.DefaultUserSettings
 import com.graveyard.core.data.local.preferences.UserSettings
 import kotlinx.coroutines.CoroutineScope
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -18,6 +19,7 @@ fun localStorageModule(
     userSettingsScope: CoroutineScope,
 ) = module {
     single { dataStore }
+    single(named("authScope")) { userSettingsScope }
     single<UserSettings>(createdAtStart = true) {
         // Json 单例由 networkModule 提供（ignoreUnknownKeys，兼容存储字段演进）。
         DefaultUserSettings(

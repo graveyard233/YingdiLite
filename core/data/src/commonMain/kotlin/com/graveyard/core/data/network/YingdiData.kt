@@ -21,7 +21,7 @@ internal interface YingdiData {
 
     suspend fun getTagList(): List<TagDetail>
 
-    /** Returns the article's rich-content HTML and author parsed from the same page. */
+    /** Returns the article's rich-content HTML, author, and interaction counts parsed from the same page. */
     suspend fun getArticleContentHtml(postId: Long): ArticleContentResponse
 
     /** 用户主页信息。响应是平铺对象，不是列表。 */

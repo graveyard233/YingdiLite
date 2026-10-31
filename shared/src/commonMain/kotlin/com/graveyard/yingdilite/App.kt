@@ -13,6 +13,7 @@ import com.graveyard.core.designsystem.theme.AppTheme
 import com.graveyard.core.designsystem.webview.WebViewPoolProvider
 import com.graveyard.core.utils.logging.Logger
 import com.graveyard.feature.news.di.newsModule
+import com.graveyard.feature.mine.di.mineModule
 import com.graveyard.yingdilite.navigation.AppNavigation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,7 @@ fun App(
                 localStorageModule(dataStore, userSettingsScope),
                 repositoryModule,
                 newsModule,
+                mineModule,
             )
         },
     ) {

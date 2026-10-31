@@ -94,6 +94,8 @@ internal class DefaultNewsRepository(
                     html = response.html,
                     baseUrl = "https://mob.iyingdi.com/post/$postId",
                     newsAuthor = response.newsAuthor,
+                    replyNum = response.replyNum,
+                    likeNum = response.likeNum,
                 ),
             )
         } catch (exception: CancellationException) {

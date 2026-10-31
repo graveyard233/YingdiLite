@@ -1,5 +1,7 @@
 package com.graveyard.core.data.local.preferences
 
+import com.graveyard.core.data.auth.AuthSession
+import com.graveyard.core.data.auth.AuthUser
 import com.graveyard.core.model.news.TagInfo
 import kotlinx.coroutines.flow.Flow
 
@@ -39,6 +41,20 @@ val DefaultTagInfos: List<TagInfo> = listOf(
  * 用户级偏好设置。扁平的小数据走这里；结构化缓存归 Room。
  */
 interface UserSettings {
+
+    /** 首次读取完成后才发出会话；null 表示没有完整凭证。 */
+    val session: Flow<AuthSession?>
+
+    /** 一次事务保存完整凭证，并替换或清除上次账号的资料。 */
+    suspend fun saveSession(session: AuthSession)
+
+    /** 只替换访问凭证，保留长期凭证、用户 ID 和资料。 */
+    suspend fun updateLoginToken(loginToken: String)
+
+    suspend fun saveUserProfile(user: AuthUser)
+
+    /** 仅删除账号数据，保留语言、订阅等偏好。 */
+    suspend fun clearSession()
 
     /** 同一磁盘版本的目录、订阅和派生信息；解码与合并在后台进行。 */
     val tagSettings: Flow<TagSettingsSnapshot>
