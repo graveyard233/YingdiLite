@@ -24,6 +24,7 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.model.news.ArticleCommentOrder
 import com.graveyard.core.model.news.ArticleCommentThread
@@ -53,8 +54,11 @@ internal fun ArticlePaneHost(
     onCardOpen: (id: String, title: String) -> Unit = { _, _ -> },
     replyNum: String = "",
     likeNum: String = "",
+    vote: ArticleVote = ArticleVote.None,
+    collected: Boolean = false,
     onWriteCommentClick: () -> Unit = {},
     onFireClick: () -> Unit = {},
+    onHateClick: () -> Unit = {},
     onFavoriteClick: () -> Unit = {},
     onLoadComments: () -> Unit,
     onCommentOrderSelected: (ArticleCommentOrder) -> Unit,
@@ -183,8 +187,11 @@ internal fun ArticlePaneHost(
                             onCardOpen = onCardOpen,
                             replyNum = replyNum,
                             likeNum = likeNum,
+                            vote = vote,
+                            collected = collected,
                             onWriteCommentClick = onWriteCommentClick,
                             onFireClick = onFireClick,
+                            onHateClick = onHateClick,
                             onFavoriteClick = onFavoriteClick,
                             contentVisible = presentation.interactive,
                             closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple,
@@ -198,6 +205,7 @@ internal fun ArticlePaneHost(
                             comments = comments,
                             listState = commentsListState,
                             likeNum = likeNum,
+                            vote = vote,
                             onBack = ::handleBack,
                             showBack = false,
                             onLoadComments = onLoadComments,
@@ -240,8 +248,11 @@ internal fun ArticlePaneHost(
                     onCardOpen = onCardOpen,
                     replyNum = replyNum,
                     likeNum = likeNum,
+                    vote = vote,
+                    collected = collected,
                     onWriteCommentClick = onWriteCommentClick,
                     onFireClick = onFireClick,
+                    onHateClick = onHateClick,
                     onFavoriteClick = onFavoriteClick,
                     onCommentsClick = {
                         if (presentation.interactive) {
@@ -255,6 +266,7 @@ internal fun ArticlePaneHost(
                     comments = comments,
                     listState = commentsListState,
                     likeNum = likeNum,
+                    vote = vote,
                     onBack = ::handleBack,
                     onLoadComments = onLoadComments,
                     onOrderSelected = onCommentOrderSelected,

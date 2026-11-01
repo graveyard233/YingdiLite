@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.component.CommonList
@@ -82,6 +83,7 @@ internal fun ArticleCommentsPage(
     listState: LazyListState,
     likeNum: String,
     onBack: () -> Unit,
+    vote: ArticleVote = ArticleVote.None,
     showBack: Boolean = true,
     onLoadComments: () -> Unit,
     onOrderSelected: (ArticleCommentOrder) -> Unit,
@@ -127,6 +129,7 @@ internal fun ArticleCommentsPage(
             ) {
                 ArticleCommentsBottomBar(
                     likeNum = likeNum,
+                    vote = vote,
                     commentOrder = commentsState.order,
                     onOrderSelected = onOrderSelected,
                     onToTopClick = {
@@ -138,6 +141,9 @@ internal fun ArticleCommentsPage(
                     },
                     onFireClick = {
                         // TODO: Connect the article heat action.
+                    },
+                    onHateClick = {
+                        // TODO: Connect the article hate action.
                     },
                     scrollBehavior = bottomBarScrollBehavior,
                 )

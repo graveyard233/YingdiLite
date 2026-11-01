@@ -23,6 +23,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FlexibleBottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,10 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.ArticleCommentOrder
 import org.jetbrains.compose.resources.stringResource
@@ -50,6 +53,7 @@ import yingdilite.feature.news.generated.resources.article_comments_write_short
 import yingdilite.feature.news.generated.resources.article_comments_order_created
 import yingdilite.feature.news.generated.resources.article_comments_order_hot
 import yingdilite.feature.news.generated.resources.article_fire_count
+import yingdilite.feature.news.generated.resources.article_hate
 import yingdilite.feature.news.generated.resources.article_to_top
 
 internal val ArticleCommentsBottomBarHeight = 56.dp
@@ -58,15 +62,19 @@ internal val ArticleCommentsBottomBarHeight = 56.dp
 @Composable
 internal fun ArticleCommentsBottomBar(
     likeNum: String,
+    vote: ArticleVote,
     commentOrder: ArticleCommentOrder,
     onOrderSelected: (ArticleCommentOrder) -> Unit,
     onToTopClick: () -> Unit,
     onFireClick: () -> Unit,
+    onHateClick: () -> Unit,
     scrollBehavior: BottomAppBarScrollBehavior,
 ) {
     val missingCount = "—"
     val fire = likeNum.ifBlank { missingCount }
     val fireDescription = stringResource(Res.string.article_fire_count, fire)
+    val liked = vote == ArticleVote.Like
+    val hated = vote == ArticleVote.Hate
     val interactive = scrollBehavior.state.collapsedFraction < 1f
     FlexibleBottomAppBar(
         modifier = Modifier.fillMaxWidth()
@@ -81,7 +89,8 @@ internal fun ArticleCommentsBottomBar(
             val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.3f
             val gutter = if (compact) 8.dp else 16.dp
             val gap = if (compact) 0.dp else 4.dp
-            val actionWidth = (maxWidth - gutter * 2 - 96.dp - gap - 8.dp)
+            // Three fixed 48dp buttons (to top, hate, write) plus the gaps between actions.
+            val actionWidth = (maxWidth - gutter * 2 - 144.dp - gap * 2 - 8.dp)
                 .coerceIn(48.dp, 80.dp)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = gutter),
@@ -108,11 +117,21 @@ internal fun ArticleCommentsBottomBar(
                         modifier = Modifier
                             .widthIn(min = 48.dp, max = actionWidth)
                             .heightIn(min = 48.dp)
-                            .semantics(mergeDescendants = true) { contentDescription = fireDescription },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = fireDescription
+                                selected = liked
+                            },
+                        // TextButton defaults to primary; inactive fire matches the other bar icons.
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = if (liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        ),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                     ) {
-                        Icon(AppIcon.Fire.imageVector, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Icon(
+                            imageVector = (if (liked) AppIcon.FireFill else AppIcon.Fire).imageVector,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = fire,
@@ -120,6 +139,16 @@ internal fun ArticleCommentsBottomBar(
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(
+                        onClick = onHateClick,
+                        enabled = interactive,
+                        modifier = Modifier.size(48.dp).semantics { selected = hated },
+                    ) {
+                        Icon(
+                            imageVector = (if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown).imageVector,
+                            contentDescription = stringResource(Res.string.article_hate),
                         )
                     }
                     IconButton(

@@ -58,6 +58,7 @@ import com.graveyard.feature.news.ui.articleDetail.NewsDetailTemplate
 import com.graveyard.feature.news.ui.articleDetail.asNewsCardOpen
 import com.graveyard.feature.news.ui.articleDetail.asNewsDeckMessage
 import com.graveyard.feature.news.ui.articleDetail.asNewsUserCardOpen
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.webview.RichContentEvent
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleInteractionBar
@@ -92,8 +93,11 @@ internal fun ArticleDetailPage(
     contentVisible: Boolean = true,
     replyNum: String = "",
     likeNum: String = "",
+    vote: ArticleVote = ArticleVote.None,
+    collected: Boolean = false,
     onWriteCommentClick: () -> Unit = {},
     onFireClick: () -> Unit = {},
+    onHateClick: () -> Unit = {},
     onFavoriteClick: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -178,10 +182,13 @@ internal fun ArticleDetailPage(
                     ArticleInteractionBar(
                         replyNum = replyNum,
                         likeNum = likeNum,
+                        vote = vote,
+                        collected = collected,
                         enabled = toolbarInteractive,
                         onCommentsClick = onCommentsClick,
                         onWriteCommentClick = onWriteCommentClick,
                         onFireClick = onFireClick,
+                        onHateClick = onHateClick,
                         onFavoriteClick = onFavoriteClick,
                         onToTopClick = {
                             contentController.scrollToTop()

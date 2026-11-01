@@ -29,7 +29,7 @@ internal fun HttpClientConfig<*>.configureYingdiClient(
     install(HttpDiagnosticsPlugin) {
         includeBodies = enableDiagnosticBodies
         omitBodies = {
-            it.encodedPath == "/web/user/login" || it.encodedPath == "/web/user/refresh-login"
+            it.encodedPath == "/mweb/user/login" || it.encodedPath == "/mweb/user/refresh-login"
         }
         // Debug 包里成功请求也输出，并在发送前打一行 -->，release 保持错误-only。
         logSuccessfulRequests = enableDiagnosticBodies

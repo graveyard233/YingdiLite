@@ -67,6 +67,7 @@
     <string name="article_write_comment">有何高见，展开讲讲</string>
     <string name="article_fire_count">%1$s 点火</string>
     <string name="article_favorite">收藏</string>
+    <string name="article_hate">点踩</string>
     <string name="article_to_top">回到顶部</string>
     <string name="article_comments_order_hot">综合</string>
     <string name="article_comments_order_created">时间</string>

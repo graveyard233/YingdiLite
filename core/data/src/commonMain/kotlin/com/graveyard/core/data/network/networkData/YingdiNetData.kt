@@ -1,6 +1,7 @@
 package com.graveyard.core.data.network.networkData
 
 import com.fleeksoft.ksoup.Ksoup
+import com.graveyard.core.data.local.preferences.UserSettings
 import com.graveyard.core.data.network.YingdiData
 import com.graveyard.core.data.network.YingdiApiExecutor
 import com.graveyard.core.data.network.model.ArticleContentResponse
@@ -16,12 +17,15 @@ import com.graveyard.core.data.result.DataException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -35,6 +39,7 @@ internal class YingdiNetData(
     private val client: HttpClient,
     private val json: Json,
     private val requests: YingdiApiExecutor,
+    private val settings: UserSettings,
 ) : YingdiData {
 
     private val mobileBaseUrl: String = "https://mob.iyingdi.com"
@@ -70,10 +75,27 @@ internal class YingdiNetData(
         return requests.post("/web/tag/main-tag-bar", YingdiSignedForm.of())
     }
 
+    /**
+     * 移动站文章页是 Nuxt SSR：服务端从 Cookie 读取身份，再用 `yd_token` 作为 `Login-Token`
+     * 拉详情，所以登录态下要带上和浏览器一致的三项身份 Cookie，才能拿到当前用户的互动状态。
+     *
+     * token 过期时 SSR 会静默降级为游客页（不返回 200002），这里不刷新也不重试：
+     * 只有 SSR 识别出的 `state.user.user_id` 与本地会话一致时才返回 [ArticleContentResponse.viewer]。
+     */
     override suspend fun getArticleContentHtml(postId: Long): ArticleContentResponse {
         val url = "$mobileBaseUrl/post/$postId"
+        val session = settings.session.first()
         val response = client.get(url) {
             accept(ContentType.Text.Html)
+            if (session != null) {
+                // 不带 If-None-Match，避免 304 空 body；埋点 Cookie 与浏览器 Sec-* 头都不需要。
+                header(
+                    HttpHeaders.Cookie,
+                    "yd_token=${session.loginToken}; " +
+                        "yd_refresh_token=${session.refreshToken}; " +
+                        "userid=${session.userId}",
+                )
+            }
         }
         if (!response.status.isSuccess()) {
             throw DataException(DataError.Http(statusCode = response.status.value))
@@ -93,6 +115,8 @@ internal class YingdiNetData(
                 newsAuthor = page.author,
                 replyNum = page.replyNum,
                 likeNum = page.likeNum,
+                hateNum = page.hateNum,
+                viewer = page.viewer?.takeIf { session != null && page.ssrUserId == session.userId },
             )
         }
     }

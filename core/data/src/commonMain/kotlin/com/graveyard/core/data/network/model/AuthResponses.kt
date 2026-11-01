@@ -8,7 +8,10 @@ internal data class RefreshLoginResponse(@SerialName("login_token") val loginTok
     override fun toString(): String = "RefreshLoginResponse(token=<redacted>)"
 }
 
-/** `POST /web/user/user-detail` 的身份展示字段；敏感及暂未使用的资料不解析、不缓存。 */
+/**
+ * `POST /mweb/user/info` 的身份展示字段；敏感及暂未使用的资料不解析、不缓存。
+ * 字段沿用 PC `/web/user/user-detail` 的结构，mweb 返回结构尚未实测。
+ */
 @Serializable
 internal data class UserDetailResponse(
     @SerialName("user_id") val userId: Long,

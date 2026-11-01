@@ -36,6 +36,7 @@ enum class AppIcon(val imageVector: ImageVector) {
     ThumbDownFill(thumbDownFill),
     Download(download),
     Favorite(favorite),
+    FavoriteFill(favoriteFill),
     Fire(fire),
     FireFill(fireFill),
     ToTop(toTop),
@@ -50,4 +51,5 @@ enum class AppIcon(val imageVector: ImageVector) {
     ChevronRight(chevronRight),
     ExpandMore(expandMore),
     Logout(logoutIcon),
+    CalendarCheck(calendarCheck),
 }

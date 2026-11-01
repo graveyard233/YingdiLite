@@ -3,8 +3,10 @@ package com.graveyard.core.data.repository
 import com.graveyard.core.data.auth.AuthSession
 import com.graveyard.core.data.auth.AuthState
 import com.graveyard.core.data.auth.AuthUser
+import com.graveyard.core.data.crypto.YingdiSignProfile
 import com.graveyard.core.data.local.preferences.UserSettings
 import com.graveyard.core.data.network.YingdiApiExecutor
+import com.graveyard.core.data.network.model.DailyTaskInfoResponse
 import com.graveyard.core.data.network.model.UserDetailResponse
 import com.graveyard.core.data.network.networkData.YingdiAuthRemoteData
 import com.graveyard.core.data.network.sign.YingdiSignedForm
@@ -12,6 +14,8 @@ import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.data.result.toDataException
+import com.graveyard.core.model.user.DailyTask
+import com.graveyard.core.model.user.DailyTaskKind
 import com.graveyard.core.utils.logging.Logger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +74,10 @@ internal class DefaultAuthRepository(
     override suspend fun refreshCurrentUser(): DataResult<AuthUser> = dataResult {
         val session = settings.session.first()
             ?: throw DataException(DataError.Business(null, "请先登录"))
-        val response = requests.post<UserDetailResponse>("/web/user/user-detail", YingdiSignedForm.of())
+        val response = requests.post<UserDetailResponse>(
+            "/mweb/user/info",
+            YingdiSignedForm.of(profile = YingdiSignProfile.Mweb),
+        )
         val currentSession = settings.session.first()
         if (currentSession == null || currentSession.userId != session.userId || response.userId != session.userId) {
             throw DataException(DataError.Parsing)
@@ -91,6 +98,29 @@ internal class DefaultAuthRepository(
         )
         settings.saveUserProfile(user)
         user
+    }
+
+    override suspend fun getDailyTasks(): DataResult<List<DailyTask>> = dataResult {
+        val session = settings.session.first()
+            ?: throw DataException(DataError.Business(null, "请先登录"))
+        // 每日任务走 PC 签名；默认 profile 即 Pc，token 与过期刷新由 YingdiApiExecutor 处理。
+        val response = requests.post<DailyTaskInfoResponse>("/web/user/center-info", YingdiSignedForm.of())
+        // 请求期间登出或换号时丢弃结果，避免把上一个账号的任务显示给当前账号。
+        if (settings.session.first()?.userId != session.userId) throw DataException(DataError.Parsing)
+        response.taskInfo
+            .filter { it.id > 0 }
+            .sortedBy { it.id }
+            .map { task ->
+                DailyTask(
+                    id = task.id,
+                    kind = DailyTaskKind.fromId(task.id),
+                    // 「收益-每日任务（每日签到）」→「每日签到」；没有括号时保留原文。
+                    title = task.title.substringAfter('（').substringBefore('）').trim(),
+                    credits = task.credits,
+                    campfire = task.campfire,
+                    completed = task.completed,
+                )
+            }
     }
 
     private fun AuthSession?.toAuthState(): AuthState =

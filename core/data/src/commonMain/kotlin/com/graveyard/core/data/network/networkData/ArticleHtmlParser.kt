@@ -1,6 +1,8 @@
 package com.graveyard.core.data.network.networkData
 
 import com.fleeksoft.ksoup.nodes.Document
+import com.graveyard.core.data.repository.ArticleViewerState
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.model.news.NewsAuthor
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -10,20 +12,29 @@ internal data class ArticlePageMeta(
     val author: NewsAuthor = NewsAuthor(),
     val replyNum: String = "",
     val likeNum: String = "",
+    val hateNum: String = "",
+    /** 当前用户与文章的关系；页面没有 `detail.user` 时为 null。 */
+    val viewer: ArticleViewerState? = null,
+    /** SSR 认定的登录用户（`state.user.user_id`）；游客页为 null，用于校验 [viewer] 是否可信。 */
+    val ssrUserId: Long? = null,
 )
 
-/** DOM first, then the __NUXT__ payload; page scripts are never evaluated. */
+/**
+ * 作者和计数 DOM 优先、__NUXT__ 兜底；踩数和用户互动状态只存在于 __NUXT__。
+ * 页面脚本不会被执行。
+ */
 internal fun parseArticlePage(document: Document, json: Json): ArticlePageMeta {
     val author = parseAuthorFromDom(document)
     val counters = parseCountersFromDom(document)
-    if (author != null && counters.replyNum.isNotEmpty() && counters.likeNum.isNotEmpty()) {
-        return ArticlePageMeta(author, counters.replyNum, counters.likeNum)
-    }
+    // 互动状态只在 __NUXT__ 里，因此即使 DOM 齐全也要读取。
     val nuxt = readNuxtPage(document, json)
     return ArticlePageMeta(
         author = author ?: nuxt?.author ?: NewsAuthor(),
         replyNum = counters.replyNum.ifEmpty { nuxt?.replyNum.orEmpty() },
         likeNum = counters.likeNum.ifEmpty { nuxt?.likeNum.orEmpty() },
+        hateNum = nuxt?.hateNum.orEmpty(),
+        viewer = nuxt?.viewer,
+        ssrUserId = nuxt?.ssrUserId,
     )
 }
 
@@ -119,20 +130,27 @@ private class NuxtPageReader(source: String, private val json: Json) {
         val post = member(detail.first, "post") ?: member(data.first + 1, "post")
         val replyNum = post?.let { readCount(it, "reply_num") }.orEmpty()
         val likeNum = post?.let { readCount(it, "like_num") }.orEmpty()
+        val hateNum = post?.let { readCount(it, "hate_num") }.orEmpty()
         val author = readAuthor(detail.first) ?: NewsAuthor()
-        if (replyNum.isEmpty() && likeNum.isEmpty() && author == NewsAuthor()) return null
-        return ArticlePageMeta(author = author, replyNum = replyNum, likeNum = likeNum)
+        val viewer = readViewer(detailStart = detail.first, dataItemStart = data.first + 1)
+        val ssrUserId = readSsrUserId(root)
+        if (replyNum.isEmpty() && likeNum.isEmpty() && hateNum.isEmpty() &&
+            author == NewsAuthor() && viewer == null
+        ) return null
+        return ArticlePageMeta(
+            author = author,
+            replyNum = replyNum,
+            likeNum = likeNum,
+            hateNum = hateNum,
+            viewer = viewer,
+            ssrUserId = ssrUserId,
+        )
     }
 
     private fun readAuthor(detailStart: Int): NewsAuthor? {
         val author = member(detailStart, "author") ?: return null
 
-        fun value(name: String): String? {
-            val range = member(author.first, name) ?: return null
-            if (range.first != range.last) return null
-            val token = tokens[range.first]
-            return bindings[token] ?: token
-        }
+        fun value(name: String): String? = scalar(author, name)
         fun text(name: String): String? = value(name)?.let(::decodeString)
 
         val id = value("id")?.toLongOrNull()?.takeIf { it >= 0 } ?: return null
@@ -144,11 +162,76 @@ private class NuxtPageReader(source: String, private val json: Json) {
         return NewsAuthor(id = id, username = username, head = head, credits = credits, badgeJson = badgeJson)
     }
 
-    private fun readCount(container: IntRange, name: String): String? {
+    /**
+     * `data[0].detail.user` 是当前用户与帖子的关系。`action`：0 = 无、1 = 赞、2 = 踩
+     * （2026-10-31 用同一账号对同一帖子赞 / 踩抓包确认）。
+     * `data[0].isPostLike` 名字像布尔，实际与 `action` 取值完全一致（0/1/2），只在缺少 `action` 时兜底。
+     * 两者都不存在时返回 null。
+     */
+    private fun readViewer(detailStart: Int, dataItemStart: Int): ArticleViewerState? {
+        val user = member(detailStart, "user")?.takeIf { tokens.getOrNull(it.first) == "{" }
+        val isPostLike = member(dataItemStart, "isPostLike")?.let(::resolve)?.toIntOrNull()
+        if (user == null && isPostLike == null) return null
+        val action = user?.let { readInt(it, "action") } ?: isPostLike ?: 0
+        val vote = when (action) {
+            1 -> ArticleVote.Like
+            2 -> ArticleVote.Hate
+            else -> ArticleVote.None
+        }
+        return ArticleViewerState(
+            vote = vote,
+            rawAction = action,
+            collected = user?.let { readBool(it, "collected") } ?: false,
+            followAuthor = user?.let { readBool(it, "follow_author") } ?: false,
+            isManager = user?.let { readBool(it, "is_manager") } ?: false,
+            voteFaction = user?.let { readInt(it, "vote_faction") } ?: 0,
+        )
+    }
+
+    /** `state.user.user_id`；游客页为 `null`（或别名到 null），此时返回 null。 */
+    private fun readSsrUserId(root: Int): Long? {
+        val state = member(root, "state") ?: return null
+        val user = member(state.first, "user") ?: return null
+        return scalar(user, "user_id")?.toLongOrNull()?.takeIf { it > 0 }
+    }
+
+    private fun readCount(container: IntRange, name: String): String? =
+        scalar(container, name)?.toLongOrNull()?.takeIf { it >= 0 }?.toString()
+
+    private fun readInt(container: IntRange, name: String): Int? =
+        scalar(container, name)?.toIntOrNull()
+
+    private fun readBool(container: IntRange, name: String): Boolean? =
+        member(container.first, name)?.let(::truthy)
+
+    /** 单 token 值，并还原 IIFE 参数别名；多 token 表达式返回 null。 */
+    private fun scalar(container: IntRange, name: String): String? {
         val range = member(container.first, name) ?: return null
+        return resolve(range)
+    }
+
+    private fun resolve(range: IntRange): String? {
         if (range.first != range.last) return null
         val token = tokens[range.first]
-        return (bindings[token] ?: token).toLongOrNull()?.takeIf { it >= 0 }?.toString()
+        return bindings[token] ?: token
+    }
+
+    /**
+     * 布尔值兼容 `true` / `false`、压缩写法 `!0` / `!1`，以及数字（非 0 为真）。
+     * 无法识别的值返回 null。
+     */
+    private fun truthy(range: IntRange): Boolean? {
+        if (range.last == range.first + 1 && tokens[range.first] == "!") {
+            val operand = bindings[tokens[range.last]] ?: tokens[range.last]
+            return truthyLiteral(operand)?.not()
+        }
+        return resolve(range)?.let(::truthyLiteral)
+    }
+
+    private fun truthyLiteral(value: String): Boolean? = when (value) {
+        "true" -> true
+        "false", "null" -> false
+        else -> value.toLongOrNull()?.let { it != 0L }
     }
 
     private fun readBindings(parameters: Int, parametersEnd: Int, arguments: Int) {

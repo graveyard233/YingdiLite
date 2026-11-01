@@ -96,6 +96,8 @@ internal class DefaultNewsRepository(
                     newsAuthor = response.newsAuthor,
                     replyNum = response.replyNum,
                     likeNum = response.likeNum,
+                    hateNum = response.hateNum,
+                    viewer = response.viewer,
                 ),
             )
         } catch (exception: CancellationException) {

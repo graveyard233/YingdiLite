@@ -93,4 +93,19 @@
     <string name="mine_legal_community">《社区规范》</string>
     <string name="mine_legal_children">《儿童个人信息保护及监护人须知》</string>
     <string name="mine_legal_back">返回登录页</string>
+    <!-- 每日任务 -->
+    <string name="mine_daily_tasks">每日任务</string>
+    <string name="mine_daily_reset">每日更新</string>
+    <string name="mine_daily_progress_label">今日进度</string>
+    <string name="mine_daily_progress">%1$d / %2$d</string>
+    <string name="mine_daily_all_done">今日任务已全部完成</string>
+    <string name="mine_daily_task_check_in">每日签到</string>
+    <string name="mine_daily_task_read">阅读文章</string>
+    <string name="mine_daily_task_like">评论点赞</string>
+    <string name="mine_daily_task_comment">发表评论</string>
+    <string name="mine_daily_reward_credits">+%1$d 经验</string>
+    <string name="mine_daily_reward_campfire">+%1$d 营火</string>
+    <string name="mine_daily_done">已完成</string>
+    <string name="mine_daily_todo">未完成</string>
+    <string name="mine_daily_load_failed">任务加载失败，点击重试</string>
 </resources>

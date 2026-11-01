@@ -30,5 +30,6 @@ shared/src/commonTest/
 /.acl-recovery/
 
 .agents/
+.claude/
 
 androidApp/release/

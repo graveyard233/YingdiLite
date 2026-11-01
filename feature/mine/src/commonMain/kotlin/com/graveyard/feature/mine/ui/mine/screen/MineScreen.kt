@@ -55,6 +55,8 @@ import com.graveyard.core.data.auth.AuthUser
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.user.UserLevelProgress
 import com.graveyard.core.model.user.calculateUserLevelProgress
+import com.graveyard.feature.mine.ui.mine.component.DailyTaskSection
+import com.graveyard.feature.mine.viewmodel.DailyTasksUiState
 import com.graveyard.feature.mine.viewmodel.MineUiState
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -130,6 +132,7 @@ fun MineScreen(
     uiState: MineUiState,
     onOpenLogin: () -> Unit,
     onLogout: () -> Unit,
+    onRetryDailyTasks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -171,7 +174,9 @@ fun MineScreen(
                 is AuthState.Authenticated -> SignedInContent(
                     userId = authState.userId,
                     user = authState.user,
+                    dailyTasks = uiState.dailyTasks,
                     isLoggingOut = uiState.isLoggingOut,
+                    onRetryDailyTasks = onRetryDailyTasks,
                     onRequestLogout = { showLogoutConfirmation = true },
                 )
             }
@@ -225,7 +230,9 @@ private fun GuestContent(onOpenLogin: () -> Unit, isLoggingIn: Boolean) {
 private fun SignedInContent(
     userId: Long,
     user: AuthUser?,
+    dailyTasks: DailyTasksUiState,
     isLoggingOut: Boolean,
+    onRetryDailyTasks: () -> Unit,
     onRequestLogout: () -> Unit,
 ) {
     val contentSettings = listOf(
@@ -246,6 +253,10 @@ private fun SignedInContent(
         ) {
             item(key = "profile") { ProfileHeader(userId, user) }
             item(key = "balance") { AccountBalance(user) }
+            // 接口返回空列表时整块隐藏；加载中与失败仍保留占位，避免高度跳动。
+            if (dailyTasks.tasks?.isEmpty() != true) {
+                item(key = "daily-tasks") { DailyTaskSection(dailyTasks, onRetry = onRetryDailyTasks) }
+            }
             item(key = "content") {
                 SettingsSection(title = stringResource(Res.string.mine_content), settings = contentSettings)
             }

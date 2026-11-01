@@ -32,15 +32,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.designsystem.icons.AppIcon
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.article_favorite
 import yingdilite.feature.news.generated.resources.article_fire_count
+import yingdilite.feature.news.generated.resources.article_hate
 import yingdilite.feature.news.generated.resources.article_comments_write_short
 import yingdilite.feature.news.generated.resources.article_to_top
 import yingdilite.feature.news.generated.resources.news_comments
@@ -50,10 +53,13 @@ import yingdilite.feature.news.generated.resources.news_comments
 internal fun ArticleInteractionBar(
     replyNum: String,
     likeNum: String,
+    vote: ArticleVote,
+    collected: Boolean,
     enabled: Boolean,
     onCommentsClick: (() -> Unit)?,
     onWriteCommentClick: () -> Unit,
     onFireClick: () -> Unit,
+    onHateClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     onToTopClick: () -> Unit,
     scrollBehavior: BottomAppBarScrollBehavior,
@@ -62,6 +68,8 @@ internal fun ArticleInteractionBar(
     val colors = MaterialTheme.colorScheme
     val replies = replyNum.ifEmpty { "0" }
     val likes = likeNum.ifEmpty { "0" }
+    val liked = vote == ArticleVote.Like
+    val hated = vote == ArticleVote.Hate
     FlexibleBottomAppBar(
         modifier = modifier,
         // Set the expanded height without constraining the collapsing layout.
@@ -75,7 +83,8 @@ internal fun ArticleInteractionBar(
             val compact = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.3f
             val gutter = if (compact) 8.dp else 16.dp
             val gap = if (compact) 0.dp else 4.dp
-            val actionWidth = ((maxWidth - gutter * 2 - 144.dp - gap * 3 - 8.dp) / 2)
+            // Four fixed 48dp buttons (to top, write, hate, favorite) plus the gaps between actions.
+            val actionWidth = ((maxWidth - gutter * 2 - 192.dp - gap * 4 - 8.dp) / 2)
                 .coerceIn(48.dp, 80.dp)
             Row(
                 modifier = Modifier
@@ -108,16 +117,37 @@ internal fun ArticleInteractionBar(
                         onClick = onCommentsClick,
                     )
                     CountAction(
-                        icon = AppIcon.Fire,
+                        icon = if (liked) AppIcon.FireFill else AppIcon.Fire,
                         count = likes,
                         label = stringResource(Res.string.article_fire_count, likes),
                         maxWidth = actionWidth,
                         enabled = enabled,
                         onClick = onFireClick,
-                        tint = colors.error,
+                        tint = if (liked) colors.error else LocalContentColor.current,
+                        selected = liked,
                     )
-                    IconButton(onClick = onFavoriteClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
-                        Icon(AppIcon.Favorite.imageVector, stringResource(Res.string.article_favorite))
+                    IconButton(
+                        onClick = onHateClick,
+                        enabled = enabled,
+                        modifier = Modifier.size(48.dp).semantics { selected = hated },
+                    ) {
+                        Icon(
+                            imageVector = (if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown).imageVector,
+                            contentDescription = stringResource(Res.string.article_hate),
+                        )
+                    }
+                    IconButton(
+                        onClick = onFavoriteClick,
+                        enabled = enabled,
+                        modifier = Modifier.size(48.dp).semantics { selected = collected },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = if (collected) colors.primary else LocalContentColor.current,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = (if (collected) AppIcon.FavoriteFill else AppIcon.Favorite).imageVector,
+                            contentDescription = stringResource(Res.string.article_favorite),
+                        )
                     }
                 }
             }
@@ -134,12 +164,17 @@ private fun CountAction(
     enabled: Boolean,
     onClick: (() -> Unit)?,
     tint: Color = LocalContentColor.current,
+    /** Non-null for toggle actions so accessibility services announce the current state. */
+    selected: Boolean? = null,
 ) {
     val iconColors = IconButtonDefaults.iconButtonColors(contentColor = tint)
     val actionModifier = Modifier
         .widthIn(min = 48.dp, max = maxWidth)
         .heightIn(min = 48.dp)
-        .semantics(mergeDescendants = true) { contentDescription = label }
+        .semantics(mergeDescendants = true) {
+            contentDescription = label
+            if (selected != null) this.selected = selected
+        }
     if (onClick != null) {
         TextButton(
             onClick = onClick,

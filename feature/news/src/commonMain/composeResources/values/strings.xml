@@ -67,6 +67,7 @@
     <string name="article_write_comment">Elaborate.</string>
     <string name="article_fire_count">%1$s hype reactions</string>
     <string name="article_favorite">Favorite</string>
+    <string name="article_hate">Dislike</string>
     <string name="article_to_top">Back to top</string>
     <string name="article_comments_order_hot">Top</string>
     <string name="article_comments_order_created">Newest</string>

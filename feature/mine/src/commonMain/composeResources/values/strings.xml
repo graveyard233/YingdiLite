@@ -93,4 +93,19 @@
     <string name="mine_legal_community">Community Guidelines</string>
     <string name="mine_legal_children">Children's Personal Information Protection and Notice to Guardians</string>
     <string name="mine_legal_back">Back to sign in</string>
+    <!-- Daily tasks -->
+    <string name="mine_daily_tasks">Daily tasks</string>
+    <string name="mine_daily_reset">Resets daily</string>
+    <string name="mine_daily_progress_label">Today's progress</string>
+    <string name="mine_daily_progress">%1$d / %2$d</string>
+    <string name="mine_daily_all_done">All tasks done for today</string>
+    <string name="mine_daily_task_check_in">Daily check-in</string>
+    <string name="mine_daily_task_read">Read an article</string>
+    <string name="mine_daily_task_like">Like a comment</string>
+    <string name="mine_daily_task_comment">Post a comment</string>
+    <string name="mine_daily_reward_credits">+%1$d XP</string>
+    <string name="mine_daily_reward_campfire">+%1$d Campfire</string>
+    <string name="mine_daily_done">Done</string>
+    <string name="mine_daily_todo">Not done</string>
+    <string name="mine_daily_load_failed">Couldn't load tasks. Tap to retry</string>
 </resources>
