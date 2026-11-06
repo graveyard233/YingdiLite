@@ -8,6 +8,7 @@ import com.graveyard.core.data.network.model.CommentUser
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.data.result.DataException
 import com.graveyard.core.model.news.ArticleComment
+import com.graveyard.core.model.news.ArticleCommentVote
 import com.graveyard.core.model.news.ArticleCommentThread
 import com.graveyard.core.model.news.NewsAuthor
 
@@ -43,7 +44,11 @@ private fun CommentItem.toArticleComment(author: CommentUser, action: Int): Arti
         authorDelete = authorDelete,
         isVisible = isVisible != 0,
         ipHome = ipHome,
-        action = action,
+        action = when (action) {
+            1 -> ArticleCommentVote.Like
+            2 -> ArticleCommentVote.Dislike
+            else -> ArticleCommentVote.None
+        },
         author = NewsAuthor(
             id = author.id,
             username = author.username,

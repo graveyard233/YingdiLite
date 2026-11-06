@@ -1,4 +1,4 @@
-package com.graveyard.yingdilite.navigation.mine
+package com.graveyard.yingdilite.navigation.auth
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.LayoutDirection
@@ -7,9 +7,6 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
-import com.graveyard.feature.mine.navigation.MineAgreementRoute
-import com.graveyard.feature.mine.navigation.MineLoginRoute
-import com.graveyard.feature.mine.navigation.MineRoute
 import com.graveyard.yingdilite.navigation.APP_PRESENTATION_KEY
 import com.graveyard.yingdilite.navigation.APP_ROUTE_KEY
 import com.graveyard.yingdilite.navigation.APP_TOP_LEVEL_KEY
@@ -18,7 +15,7 @@ import com.graveyard.yingdilite.navigation.AppScenePresentation
 import com.graveyard.yingdilite.navigation.PaneBounds
 import com.graveyard.yingdilite.navigation.scenePresentation
 
-internal fun createMineSceneStrategy(
+internal fun createAuthSceneStrategy(
     width: Float,
     height: Float,
     navigationWidth: Float,
@@ -26,8 +23,8 @@ internal fun createMineSceneStrategy(
     direction: LayoutDirection,
     verticalHinges: List<PaneBounds>,
     horizontalHinges: List<PaneBounds>,
-): MineSceneStrategy = MineSceneStrategy(
-    calculateMineLayout(
+): AuthSceneStrategy = AuthSceneStrategy(
+    calculateLoginLayout(
         width = width,
         height = height,
         navigationWidth = navigationWidth,
@@ -38,28 +35,30 @@ internal fun createMineSceneStrategy(
     ),
 )
 
-internal data class MineSceneStrategy(val layout: MineLayout) : SceneStrategy<NavKey> {
+internal data class AuthSceneStrategy(val layout: LoginLayout) : SceneStrategy<NavKey> {
     override fun SceneStrategyScope<NavKey>.calculateScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? =
         createScene(entries)
 
     fun createScene(entries: List<NavEntry<NavKey>>): Scene<NavKey>? {
         val last = entries.lastOrNull() ?: return null
-        if (last.metadata[APP_TOP_LEVEL_KEY] != MineRoute) return null
+        val owner = last.metadata[APP_TOP_LEVEL_KEY]
         val route = last.metadata[APP_ROUTE_KEY]
-        if (route != MineLoginRoute && route !is MineAgreementRoute) return null
+        if (route !is LoginRoute && route !is LoginAgreementRoute) return null
         val login = entries.getOrNull(entries.lastIndex - 1)?.takeIf {
-            it.metadata[APP_ROUTE_KEY] == MineLoginRoute && it.metadata[APP_TOP_LEVEL_KEY] == MineRoute
+            val key = it.metadata[APP_ROUTE_KEY] as? LoginRoute
+            key != null && (route as? LoginAgreementRoute)?.loginInstanceId == key.instanceId &&
+                it.metadata[APP_TOP_LEVEL_KEY] == owner
         }
-        val panes = if (route is MineAgreementRoute && login != null &&
+        val panes = if (route is LoginAgreementRoute && login != null &&
             layout.login != null && layout.agreement != null
         ) {
             listOf(login to layout.login, last to layout.agreement)
         } else listOf(last to layout.single)
-        return MineScene(layout.showsNavigation, panes, entries.dropLast(1))
+        return AuthScene(layout.showsNavigation, panes, entries.dropLast(1))
     }
 }
 
-private data class MineScene(
+private data class AuthScene(
     val showsNavigation: Boolean,
     val panes: List<Pair<NavEntry<NavKey>, PaneBounds>>,
     override val previousEntries: List<NavEntry<NavKey>>,
@@ -78,9 +77,9 @@ private data class MineScene(
     }
 }
 
-internal fun isMineAgreementPaneChange(initial: Scene<NavKey>, target: Scene<NavKey>): Boolean {
+internal fun isLoginAgreementPaneChange(initial: Scene<NavKey>, target: Scene<NavKey>): Boolean {
     val from = scenePresentation(initial).visibleEntryKeys
     val to = scenePresentation(target).visibleEntryKeys
-    return MineLoginRoute in from && MineLoginRoute in to &&
-        (from.any { it is MineAgreementRoute } || to.any { it is MineAgreementRoute })
+    return from.filterIsInstance<LoginRoute>().any { it in to } &&
+        (from.any { it is LoginAgreementRoute } || to.any { it is LoginAgreementRoute })
 }

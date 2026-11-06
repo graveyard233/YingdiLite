@@ -1,5 +1,7 @@
 package com.graveyard.core.model.news
 
+import kotlinx.serialization.Serializable
+
 /** A comment from a news article, mapped from the network response. */
 data class ArticleComment(
     val id: Long,
@@ -15,7 +17,7 @@ data class ArticleComment(
     val authorDelete: Boolean,
     val isVisible: Boolean,
     val ipHome: String,
-    val action: Int,
+    val action: ArticleCommentVote,
     val author: NewsAuthor,
 )
 
@@ -30,6 +32,12 @@ enum class ArticleCommentOrder(val apiValue: String) {
     Hot("hot"),
     Created("created"),
 }
+
+/** The authenticated viewer's state for a comment. */
+@Serializable
+enum class ArticleCommentVote { None, Like, Dislike }
+
+enum class ArticleCommentVoteAction { Like, CancelLike, Dislike, CancelDislike }
 
 /** Metadata returned alongside each comment-list response. */
 data class ArticleCommentsMetadata(

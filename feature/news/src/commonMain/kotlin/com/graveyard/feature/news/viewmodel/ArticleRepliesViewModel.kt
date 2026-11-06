@@ -8,10 +8,14 @@ import androidx.paging.cachedIn
 import androidx.paging.filter
 import com.graveyard.core.data.repository.ArticleRepliesFeed
 import com.graveyard.core.data.repository.NewsRepository
+import com.graveyard.core.data.repository.AuthRepository
+import com.graveyard.core.data.auth.AuthState
 import com.graveyard.core.data.result.DataError
 import com.graveyard.core.model.news.ArticleComment
+import com.graveyard.core.model.news.ArticleCommentVote
 import com.graveyard.core.model.news.ArticleRepliesMetadata
 import com.graveyard.core.model.news.ArticleReplyOrder
+import com.graveyard.feature.news.navigation.ArticleAuthAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -28,11 +32,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ArticleRepliesViewModel(
+class ArticleRepliesViewModel internal constructor(
     private val repository: NewsRepository,
+    private val commentVoteCoordinator: CommentVoteCoordinator,
+    private val authRepository: AuthRepository,
+    private val articleId: String,
     private val commentId: Long,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+    private val commentSnapshots = mutableMapOf<Long, ArticleComment>()
     private val mutableUiState = MutableStateFlow(
         ArticleRepliesUiState(
             order = ArticleReplyOrder.entries.firstOrNull {
@@ -44,6 +52,7 @@ class ArticleRepliesViewModel(
     private val replySessions = MutableStateFlow<Flow<PagingData<ArticleComment>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     val replies = replySessions.flatMapLatest { it }
+    fun commentVoteStates(userId: Long?) = commentVoteCoordinator.observeArticle(articleId.toLongOrNull() ?: 0L, userId)
     private var sessionJob: Job? = null
 
     init { loadReplies() }
@@ -84,13 +93,29 @@ class ArticleRepliesViewModel(
         startRepliesSession(order)
     }
 
-    fun onLikeClicked(commentId: Long, parentCommentId: Long) {
-        // TODO: Connect the comment like endpoint.
+    fun onLikeClicked(comment: ArticleComment, parentCommentId: Long) = vote(comment, ArticleCommentVote.Like)
+
+    fun onDislikeClicked(comment: ArticleComment, parentCommentId: Long) = vote(comment, ArticleCommentVote.Dislike)
+
+    fun vote(comment: ArticleComment, target: ArticleCommentVote, userId: Long? = currentUserId()) {
+        cacheCommentSnapshot(comment)
+        val postId = articleId.toLongOrNull()?.takeIf { it > 0L } ?: return
+        val authenticatedUserId = userId?.takeIf { it == currentUserId() } ?: return
+        commentVoteCoordinator.vote(postId, authenticatedUserId, comment, target)
     }
 
-    fun onDislikeClicked(commentId: Long, parentCommentId: Long) {
-        // TODO: Connect the comment dislike endpoint.
+    fun cacheCommentSnapshot(comment: ArticleComment) { commentSnapshots[comment.id] = comment }
+
+    fun canAcceptInteraction(userId: Long): Boolean = currentUserId() == userId
+
+    fun performInteraction(action: ArticleAuthAction, userId: Long) {
+        if (action !is ArticleAuthAction.SetCommentVote) return
+        if (action.postId != articleId.toLongOrNull() || currentUserId() != userId) return
+        val comment = commentSnapshots[action.commentId] ?: return
+        vote(comment, action.vote, userId)
     }
+
+    private fun currentUserId() = (authRepository.state.value as? AuthState.Authenticated)?.userId
 
     fun onMoreClicked(commentId: Long, parentCommentId: Long) {
         // TODO: Connect the comment actions menu.

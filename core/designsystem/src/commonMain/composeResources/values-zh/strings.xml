@@ -5,4 +5,7 @@
     <string name="image_gallery_close">关闭图片</string>
     <string name="image_gallery_download">下载图片</string>
     <string name="image_gallery_load_failed">图片加载失败</string>
+    <string name="auth_required_title">需要登录</string>
+    <string name="auth_go_to_login">去登录</string>
+    <string name="auth_cancel">取消</string>
 </resources>

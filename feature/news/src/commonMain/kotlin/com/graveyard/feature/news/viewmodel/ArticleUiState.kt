@@ -11,4 +11,7 @@ data class ArticleUiState(
     val newsAuthor: NewsAuthor = NewsAuthor(),
     val isLoading: Boolean = true,
     val error: DataError? = null,
+    val interaction: ArticleInteractionState = ArticleInteractionState(),
+    val isVoteCoolingDown: Boolean = false,
+    val interactionFeedback: ArticleInteractionFeedback? = null,
 )

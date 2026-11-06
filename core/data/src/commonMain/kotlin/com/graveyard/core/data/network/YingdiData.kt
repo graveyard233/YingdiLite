@@ -54,4 +54,33 @@ internal interface YingdiData {
         order: String,
         size: Int = 10,
     ): CommentGroup
+
+    /**
+     * 收藏 / 取消收藏文章：`POST /web/post/collect`。
+     *
+     * 接口没有额外参数，服务端按当前收藏状态取反，所以同一个方法同时承担收藏和取消收藏；
+     * 成功时无响应体，失败抛 [com.graveyard.core.data.result.DataException]。
+     */
+    suspend fun toggleArticleCollect(postId: Long, expectedUserId: Long? = null)
+
+    /**
+     * 点赞 / 点踩 / 取消：`POST /web/post/like`。
+     *
+     * 三种行为共用同一接口，由 [action] 决定；成功时无响应体。
+     *
+     * @param action `0` 无（取消）、`1` 赞、`2` 踩。
+     */
+    suspend fun setArticleVote(postId: Long, action: Int, expectedUserId: Long? = null)
+
+    /**
+     * 评论点赞 / 点踩及取消：`POST /web/post/like-comment`，成功时无响应体。
+     *
+     * @param action `1` 点赞、`-1` 取消点赞、`2` 点踩、`-2` 取消点踩，按原值传递。
+     */
+    suspend fun setCommentLike(
+        postId: Long,
+        commentId: Long,
+        action: Int,
+        expectedUserId: Long? = null,
+    )
 }

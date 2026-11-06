@@ -1,17 +1,17 @@
-package com.graveyard.yingdilite.navigation.mine
+package com.graveyard.yingdilite.navigation.auth
 
 import androidx.compose.ui.unit.LayoutDirection
 import com.graveyard.yingdilite.navigation.PaneBounds
 import com.graveyard.yingdilite.navigation.availablePaneIntervals
 
-internal data class MineLayout(
+internal data class LoginLayout(
     val single: PaneBounds,
     val login: PaneBounds? = null,
     val agreement: PaneBounds? = null,
     val showsNavigation: Boolean,
 )
 
-internal object MinePaneMinimums {
+internal object LoginPaneMinimums {
     const val Login = 360f
     const val Agreement = 480f
     const val WithNavigation = 320f
@@ -21,7 +21,7 @@ internal object MinePaneMinimums {
 }
 
 /** Reserve the potential rail first; reclaim its space if the remaining partition is too narrow. */
-internal fun calculateMineLayout(
+internal fun calculateLoginLayout(
     width: Float,
     height: Float,
     navigationWidth: Float,
@@ -29,8 +29,8 @@ internal fun calculateMineLayout(
     direction: LayoutDirection,
     verticalHinges: List<PaneBounds>,
     horizontalHinges: List<PaneBounds>,
-): MineLayout {
-    fun measure(reserveNavigation: Boolean) = measureMineLayout(
+): LoginLayout {
+    fun measure(reserveNavigation: Boolean) = measureLoginLayout(
         width = width,
         height = height,
         navigationWidth = if (reserveNavigation) navigationWidth else 0f,
@@ -40,12 +40,12 @@ internal fun calculateMineLayout(
         horizontalHinges = horizontalHinges,
     )
     val candidate = measure(showsNavigation)
-    return if (showsNavigation && candidate.single.width < MinePaneMinimums.WithNavigation) {
+    return if (showsNavigation && candidate.single.width < LoginPaneMinimums.WithNavigation) {
         measure(reserveNavigation = false)
     } else candidate
 }
 
-private fun measureMineLayout(
+private fun measureLoginLayout(
     width: Float,
     height: Float,
     navigationWidth: Float,
@@ -53,7 +53,7 @@ private fun measureMineLayout(
     direction: LayoutDirection,
     verticalHinges: List<PaneBounds>,
     horizontalHinges: List<PaneBounds>,
-): MineLayout {
+): LoginLayout {
     val w = (width - navigationWidth).coerceAtLeast(0f)
     val h = height.coerceAtLeast(0f)
     val origin = if (direction == LayoutDirection.Ltr) navigationWidth else 0f
@@ -67,28 +67,28 @@ private fun measureMineLayout(
     val single = bounds(widest)
     // Prefer separate physical panels when the hinge divides the window.
     for (i in columns.indices) {
-        if (columns[i].second - columns[i].first < MinePaneMinimums.Login) continue
-        val supporting = columns.drop(i + 1).firstOrNull { it.second - it.first >= MinePaneMinimums.Agreement }
+        if (columns[i].second - columns[i].first < LoginPaneMinimums.Login) continue
+        val supporting = columns.drop(i + 1).firstOrNull { it.second - it.first >= LoginPaneMinimums.Agreement }
         if (supporting != null) {
-            return MineLayout(single, bounds(columns[i]), bounds(supporting), showsNavigation)
+            return LoginLayout(single, bounds(columns[i]), bounds(supporting), showsNavigation)
         }
     }
-    val dualMinimum = MinePaneMinimums.Login + MinePaneMinimums.Agreement +
-        MinePaneMinimums.Margin * 2 + MinePaneMinimums.Gap
+    val dualMinimum = LoginPaneMinimums.Login + LoginPaneMinimums.Agreement +
+        LoginPaneMinimums.Margin * 2 + LoginPaneMinimums.Gap
     // Otherwise split one uninterrupted region: 360 + 480 + 24 + 16 = 880dp.
     if (single.width >= dualMinimum) {
-        val available = single.width - MinePaneMinimums.Margin * 2 - MinePaneMinimums.Gap
-        val loginWidth = (available * 0.38f).coerceIn(MinePaneMinimums.Login, MinePaneMinimums.MaximumLogin)
+        val available = single.width - LoginPaneMinimums.Margin * 2 - LoginPaneMinimums.Gap
+        val loginWidth = (available * 0.38f).coerceIn(LoginPaneMinimums.Login, LoginPaneMinimums.MaximumLogin)
         val agreementWidth = available - loginWidth
-        val start = single.left + MinePaneMinimums.Margin
-        val loginLeft = if (direction == LayoutDirection.Ltr) start else start + agreementWidth + MinePaneMinimums.Gap
-        val agreementLeft = if (direction == LayoutDirection.Ltr) start + loginWidth + MinePaneMinimums.Gap else start
-        return MineLayout(
+        val start = single.left + LoginPaneMinimums.Margin
+        val loginLeft = if (direction == LayoutDirection.Ltr) start else start + agreementWidth + LoginPaneMinimums.Gap
+        val agreementLeft = if (direction == LayoutDirection.Ltr) start + loginWidth + LoginPaneMinimums.Gap else start
+        return LoginLayout(
             single,
             PaneBounds(loginLeft, single.top, loginWidth, single.height),
             PaneBounds(agreementLeft, single.top, agreementWidth, single.height),
             showsNavigation,
         )
     }
-    return MineLayout(single = single, showsNavigation = showsNavigation)
+    return LoginLayout(single = single, showsNavigation = showsNavigation)
 }

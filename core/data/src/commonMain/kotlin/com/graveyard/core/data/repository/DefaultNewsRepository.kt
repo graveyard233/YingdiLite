@@ -13,6 +13,8 @@ import com.graveyard.core.data.paging.NewsPagingSource
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.data.result.toDataException
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleCommentVote
+import com.graveyard.core.model.news.ArticleCommentVoteAction
 import com.graveyard.core.model.news.ArticleReplyOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
@@ -106,6 +108,49 @@ internal class DefaultNewsRepository(
             currentCoroutineContext().ensureActive()
             DataResult.Failure(exception.toDataException().error)
         }
+    }
+
+    override suspend fun setArticleVote(postId: Long, vote: ArticleVote, userId: Long): DataResult<Unit> = interaction {
+        require(postId > 0) { "postId must be positive" }
+        remoteDataSource.setArticleVote(postId, when (vote) {
+            ArticleVote.None -> 0
+            ArticleVote.Like -> 1
+            ArticleVote.Hate -> 2
+        }, expectedUserId = userId)
+    }
+
+    override suspend fun toggleArticleCollect(postId: Long, userId: Long): DataResult<Unit> = interaction {
+        require(postId > 0) { "postId must be positive" }
+        remoteDataSource.toggleArticleCollect(postId, expectedUserId = userId)
+    }
+
+    override suspend fun setCommentVote(
+        postId: Long,
+        commentId: Long,
+        action: ArticleCommentVoteAction,
+        userId: Long,
+    ): DataResult<Unit> = interaction {
+        require(postId > 0) { "postId must be positive" }
+        require(commentId > 0) { "commentId must be positive" }
+        val currentUserId = userId.takeIf { it > 0 } ?: throw IllegalArgumentException("userId must be positive")
+        val requestAction = when (action) {
+            ArticleCommentVoteAction.Like -> 1
+            ArticleCommentVoteAction.CancelLike -> -1
+            ArticleCommentVoteAction.Dislike -> 2
+            ArticleCommentVoteAction.CancelDislike -> -2
+        }
+        remoteDataSource.setCommentLike(postId, commentId, requestAction, expectedUserId = currentUserId)
+    }
+
+    private suspend fun interaction(block: suspend () -> Unit): DataResult<Unit> = try {
+        block()
+        currentCoroutineContext().ensureActive()
+        DataResult.Success(Unit)
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (exception: Exception) {
+        currentCoroutineContext().ensureActive()
+        DataResult.Failure(exception.toDataException().error)
     }
 
     override fun getArticleComments(

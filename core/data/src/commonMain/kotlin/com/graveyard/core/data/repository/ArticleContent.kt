@@ -1,6 +1,7 @@
 package com.graveyard.core.data.repository
 
 import com.graveyard.core.model.news.NewsAuthor
+import kotlinx.serialization.Serializable
 
 data class ArticleContent(
     val articleId: Long,
@@ -15,6 +16,7 @@ data class ArticleContent(
 )
 
 /** 当前用户对文章的态度，来自 `detail.user.action`。 */
+@Serializable
 enum class ArticleVote { None, Like, Hate }
 
 /** 当前登录用户与文章的关系，来自详情页 `__NUXT__` 的 `data[0].detail.user`。 */

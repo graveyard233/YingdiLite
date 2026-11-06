@@ -3,6 +3,8 @@ package com.graveyard.core.data.repository
 import androidx.paging.PagingData
 import com.graveyard.core.data.result.DataResult
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleCommentVote
+import com.graveyard.core.model.news.ArticleCommentVoteAction
 import com.graveyard.core.model.news.ArticleReplyOrder
 import com.graveyard.core.model.news.NewsArticle
 import com.graveyard.core.model.news.NewsBanner
@@ -25,6 +27,18 @@ interface NewsRepository {
     suspend fun refreshTagInfos(): DataResult<List<TagInfo>>
 
     suspend fun getArticleContent(postId: Long): DataResult<ArticleContent>
+
+    suspend fun setArticleVote(postId: Long, vote: ArticleVote, userId: Long): DataResult<Unit>
+
+    suspend fun setCommentVote(
+        postId: Long,
+        commentId: Long,
+        action: ArticleCommentVoteAction,
+        userId: Long,
+    ): DataResult<Unit>
+
+    /** Reverses server state; callers must synchronise unknown state and must not retry blindly. */
+    suspend fun toggleArticleCollect(postId: Long, userId: Long): DataResult<Unit>
 
     /** Returns one paging session for an article's comments and the selected ordering. */
     fun getArticleComments(

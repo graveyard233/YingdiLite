@@ -1,5 +1,7 @@
 package com.graveyard.feature.news.ui.articleDetail.component
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +38,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,11 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -58,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -65,6 +72,8 @@ import coil3.compose.AsyncImage
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.ArticleComment
 import com.graveyard.core.model.news.ArticleCommentThread
+import com.graveyard.core.model.news.ArticleCommentVote
+import com.graveyard.feature.news.viewmodel.CommentVoteUiState
 import com.graveyard.feature.news.ui.newsList.component.relativeNewsTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -93,12 +102,13 @@ private const val CollapsedCommentLines = 5
 internal fun ArticleCommentItem(
     thread: ArticleCommentThread,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onViewReplies: (commentId: Long) -> Unit,
     modifier: Modifier = Modifier,
     showDivider: Boolean = true,
+    voteStates: Map<Long, CommentVoteUiState> = emptyMap(),
 ) {
     val comment = thread.mainComment
     val replies = thread.replies.take(ReplyPreviewLimit)
@@ -109,7 +119,7 @@ internal fun ArticleCommentItem(
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = if (needShowReply) 8.dp else 0.dp),
         ) {
             CommentBody(comment, comment.id, thread.isManager, true, true,
-                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates)
             if (needShowReply) {
                 Column(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
@@ -119,7 +129,7 @@ internal fun ArticleCommentItem(
                         if (index > 0) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         }
-                        ReplyPreview(reply, comment.id, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+                        ReplyPreview(reply, comment.id, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates)
                     }
                     if (replyCount > replies.size) {
                         TextButton(
@@ -151,14 +161,15 @@ internal fun ArticleThreadCommentItem(
     isManager: Boolean,
     isRoot: Boolean,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState> = emptyMap(),
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 8.dp)) {
             CommentBody(comment, parentCommentId, isManager, isRoot, isRoot,
-                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked)
+                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates)
         }
         if (!isRoot) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
@@ -172,9 +183,10 @@ private fun CommentBody(
     showLevel: Boolean,
     collapsible: Boolean,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState>,
 ) {
     CommentAuthorHeader(comment, isManager, showLevel = showLevel, onMoreClicked = {
         onMoreClicked(comment.id, parentCommentId)
@@ -182,7 +194,7 @@ private fun CommentBody(
     CommentContent(comment, Modifier.padding(top = 6.dp), collapsible = collapsible)
     if (comment.isVisible && !comment.authorDelete) {
         CommentImages(comment.imageUrls, onImageClick)
-        CommentActions(comment, parentCommentId, onLikeClicked, onDislikeClicked)
+        CommentActions(comment, parentCommentId, onLikeClicked, onDislikeClicked, voteStates = voteStates)
     }
 }
 
@@ -191,16 +203,17 @@ private fun ReplyPreview(
     comment: ArticleComment,
     parentCommentId: Long,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState>,
 ) {
     Column(modifier = Modifier.padding(top = 8.dp)) {
         ReplyContent(comment)
         if (comment.isVisible && !comment.authorDelete) {
             CommentImages(comment.imageUrls, onImageClick, compact = true)
         }
-        ReplyFooter(comment, parentCommentId, onLikeClicked, onDislikeClicked, onMoreClicked)
+        ReplyFooter(comment, parentCommentId, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates)
     }
 }
 
@@ -406,9 +419,10 @@ private fun CommentMetadataText(metadata: AnnotatedString, modifier: Modifier = 
 private fun ReplyFooter(
     comment: ArticleComment,
     parentCommentId: Long,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState>,
 ) {
     val metadata = AnnotatedString(commentMetadata(comment))
     val deleted = comment.authorDelete || !comment.isVisible
@@ -416,8 +430,11 @@ private fun ReplyFooter(
     val density = LocalDensity.current
     val countStyle = MaterialTheme.typography.labelMedium
     val metadataStyle = MaterialTheme.typography.bodySmall
+    val voteState = voteStates[comment.id]
+    val likeCount = voteState?.likeNum ?: comment.likeNum
+    val hateCount = voteState?.hateNum ?: comment.hateNum
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val countWidths = listOf(comment.likeNum, comment.hateNum).map { count ->
+        val countWidths = listOf(likeCount, hateCount).map { count ->
             val textWidth = if (count > 0) {
                 with(density) { textMeasurer.measure(AnnotatedString(count.toString()), countStyle).size.width.toDp() }
             } else 0.dp
@@ -433,13 +450,13 @@ private fun ReplyFooter(
                 Spacer(Modifier.width(8.dp))
                 CommentActions(
                     comment, parentCommentId, onLikeClicked, onDislikeClicked,
-                    Modifier.width(actionsWidth), onMoreClicked,
+                    Modifier.width(actionsWidth), onMoreClicked, voteStates,
                 )
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 CommentMetadataText(metadata)
-                CommentActions(comment, parentCommentId, onLikeClicked, onDislikeClicked, onMoreClicked = onMoreClicked)
+                CommentActions(comment, parentCommentId, onLikeClicked, onDislikeClicked, onMoreClicked = onMoreClicked, voteStates = voteStates)
             }
         }
     }
@@ -488,15 +505,34 @@ private fun CommentImages(
     }
 }
 
+@OptIn(ExperimentalTime::class)
 @Composable
 private fun CommentActions(
     comment: ArticleComment,
     parentCommentId: Long,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     modifier: Modifier = Modifier,
     onMoreClicked: ((commentId: Long, parentCommentId: Long) -> Unit)? = null,
+    voteStates: Map<Long, CommentVoteUiState> = emptyMap(),
 ) {
+    val voteState = voteStates[comment.id]
+    val vote = voteState?.vote ?: comment.action
+    val likeAllowed = vote != ArticleCommentVote.Dislike
+    val dislikeAllowed = vote != ArticleCommentVote.Like
+    val likeNum = voteState?.likeNum ?: comment.likeNum
+    val hateNum = voteState?.hateNum ?: comment.hateNum
+    val pending = voteState?.isPending == true
+    val coolingDown = voteState?.isCoolingDown == true
+    val cooldownDeadline = voteState?.cooldownUntilMillis ?: 0L
+    val cooldownProgress = remember(comment.id, cooldownDeadline) { Animatable(if (coolingDown) 0f else 1f) }
+    LaunchedEffect(cooldownDeadline) {
+        if (cooldownDeadline > 0L) {
+            val remaining = (cooldownDeadline - Clock.System.now().toEpochMilliseconds()).coerceAtLeast(0L)
+            cooldownProgress.snapTo(0f)
+            if (remaining > 0L) cooldownProgress.animateTo(1f, tween(remaining.toInt()))
+        } else cooldownProgress.snapTo(1f)
+    }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val fixedActionsWidth = if (onMoreClicked != null) 96.dp else 48.dp
         val maxVoteWidth = maxOf(48.dp, (maxWidth - fixedActionsWidth) / 2)
@@ -513,19 +549,28 @@ private fun CommentActions(
                 Spacer(Modifier.weight(1f))
                 CommentAction(
                     modifier = Modifier.widthIn(max = maxVoteWidth),
-                    icon = AppIcon.Fire,
-                    count = comment.likeNum,
+                    icon = if (vote == ArticleCommentVote.Like) AppIcon.FireFill else AppIcon.Fire,
+                    count = likeNum,
                     label = stringResource(Res.string.article_comment_like),
-                    countLabel = stringResource(Res.string.article_comment_like_count, comment.likeNum.toString()),
-                    onClick = { onLikeClicked(comment.id, parentCommentId) },
+                    countLabel = stringResource(Res.string.article_comment_like_count, likeNum.toString()),
+                    onClick = { onLikeClicked(comment, parentCommentId) },
+                    selected = vote == ArticleCommentVote.Like,
+                    tint = if (vote == ArticleCommentVote.Like) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    enabled = !pending && !coolingDown && likeAllowed,
+                    coolingDown = coolingDown && likeAllowed,
+                    cooldownProgress = { cooldownProgress.value },
                 )
                 CommentAction(
                     modifier = Modifier.widthIn(max = maxVoteWidth),
-                    icon = AppIcon.ThumbDown,
-                    count = comment.hateNum,
+                    icon = if (vote == ArticleCommentVote.Dislike) AppIcon.ThumbDownFill else AppIcon.ThumbDown,
+                    count = hateNum,
                     label = stringResource(Res.string.article_comment_dislike),
-                    countLabel = stringResource(Res.string.article_comment_dislike_count, comment.hateNum.toString()),
-                    onClick = { onDislikeClicked(comment.id, parentCommentId) },
+                    countLabel = stringResource(Res.string.article_comment_dislike_count, hateNum.toString()),
+                    onClick = { onDislikeClicked(comment, parentCommentId) },
+                    selected = vote == ArticleCommentVote.Dislike,
+                    enabled = !pending && !coolingDown && dislikeAllowed,
+                    coolingDown = coolingDown && dislikeAllowed,
+                    cooldownProgress = { cooldownProgress.value },
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -549,26 +594,56 @@ private fun CommentAction(
     countLabel: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    enabled: Boolean = true,
+    coolingDown: Boolean = false,
+    cooldownProgress: () -> Float = { 1f },
 ) {
+    val disabledTint = tint.copy(alpha = tint.alpha * 0.38f)
     CommentTooltip(label) {
         TextButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier.widthIn(min = 48.dp).heightIn(min = 48.dp)
-                .semantics(mergeDescendants = true) { contentDescription = "$label, $countLabel" },
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                .semantics(mergeDescendants = true) {
+                    contentDescription = "$label, $countLabel"
+                    this.selected = selected
+                },
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = tint,
+                disabledContentColor = disabledTint,
+            ),
             contentPadding = PaddingValues(horizontal = 6.dp),
         ) {
-            Icon(icon.imageVector, contentDescription = null, modifier = Modifier.size(20.dp))
-            if (count > 0) {
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = count.toString(),
-                    modifier = Modifier.clearAndSetSemantics {},
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            if (coolingDown) Box {
+                CommentActionContent(icon, count, disabledTint)
+                CommentActionContent(
+                    icon, count, tint,
+                    Modifier.matchParentSize().drawWithContent {
+                        val fraction = cooldownProgress().coerceIn(0f, 1f)
+                        if (fraction > 0f) clipRect(bottom = size.height * fraction) { this@drawWithContent.drawContent() }
+                    },
                 )
-            }
+            } else CommentActionContent(icon, count, if (enabled) tint else disabledTint)
+        }
+    }
+}
+
+@Composable
+private fun CommentActionContent(icon: AppIcon, count: Int, tint: Color, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon.imageVector, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
+        if (count > 0) {
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = count.toString(),
+                modifier = Modifier.clearAndSetSemantics {},
+                color = tint,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

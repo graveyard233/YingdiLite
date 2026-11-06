@@ -186,4 +186,57 @@ internal class YingdiNetData(
             ),
         )
     }
+
+    /**
+     * 收藏 / 取消收藏：`POST /web/post/collect`，表单只有 `post_ids`。
+     *
+     * 服务端按当前状态取反，所以没有单独的收藏/取消收藏接口，也不需要额外参数；
+     * 接口无响应体，成功与否只看 HTTP 状态（业务错误信封仍会正常抛出）。
+     */
+    override suspend fun toggleArticleCollect(postId: Long, expectedUserId: Long?) {
+        requests.postNoContent(
+            "/web/post/collect",
+            YingdiSignedForm.of("post_ids" to postId.toString()),
+            expectedUserId = expectedUserId,
+        )
+    }
+
+    /**
+     * 点赞 / 点踩：`POST /web/post/like`，表单为 `post_id` 与 `action`。
+     *
+     * `action` 为 `0` 无、`1` 赞、`2` 踩，三种行为共用这个接口；
+     * 接口无响应体，成功与否只看 HTTP 状态（业务错误信封仍会正常抛出）。
+     */
+    override suspend fun setArticleVote(postId: Long, action: Int, expectedUserId: Long?) {
+        requests.postNoContent(
+            "/web/post/like",
+            YingdiSignedForm.of(
+                "post_id" to postId.toString(),
+                "action" to action.toString(),
+            ),
+            expectedUserId = expectedUserId,
+        )
+    }
+
+    /**
+     * 评论点赞 / 点踩及取消：签名表单提交业务参数，复用无响应体校验与 token 刷新逻辑。
+     *
+     * @param action `1` 点赞、`-1` 取消点赞、`2` 点踩、`-2` 取消点踩，按原值传递。
+     */
+    override suspend fun setCommentLike(
+        postId: Long,
+        commentId: Long,
+        action: Int,
+        expectedUserId: Long?,
+    ) {
+        requests.postNoContent(
+            "/web/post/like-comment",
+            YingdiSignedForm.of(
+                "action" to action.toString(),
+                "comment_id" to commentId.toString(),
+                "post_id" to postId.toString(),
+            ),
+            expectedUserId = expectedUserId,
+        )
+    }
 }

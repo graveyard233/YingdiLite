@@ -95,10 +95,15 @@ internal fun ArticleDetailPage(
     likeNum: String = "",
     vote: ArticleVote = ArticleVote.None,
     collected: Boolean = false,
+    interactionEnabled: Boolean = true,
+    voteEnabled: Boolean = true,
+    isVoteCoolingDown: Boolean = false,
+    voteCooldownProgress: () -> Float = { 1f },
     onWriteCommentClick: () -> Unit = {},
-    onFireClick: () -> Unit = {},
-    onHateClick: () -> Unit = {},
+    onFireClick: (SnackbarHostState) -> Unit = {},
+    onHateClick: (SnackbarHostState) -> Unit = {},
     onFavoriteClick: () -> Unit = {},
+    snackbarHostState: SnackbarHostState,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val contentController = remember(uiState.articleId) { RichContentController() }
@@ -114,7 +119,6 @@ internal fun ArticleDetailPage(
         snapAnimationSpec = tween(150),
     )
     val toolbarInteractive = contentVisible && showToolbar && toolbarState.collapsedFraction < 1f
-    val snackbarHostState = remember { SnackbarHostState() }
     val clipboard = LocalClipboard.current
     val coroutineScope = rememberCoroutineScope()
     val deckCopiedMessage = stringResource(Res.string.article_deck_copied)
@@ -185,10 +189,14 @@ internal fun ArticleDetailPage(
                         vote = vote,
                         collected = collected,
                         enabled = toolbarInteractive,
+                        interactionEnabled = interactionEnabled,
+                        voteEnabled = voteEnabled,
+                        isVoteCoolingDown = isVoteCoolingDown,
+                        voteCooldownProgress = voteCooldownProgress,
                         onCommentsClick = onCommentsClick,
                         onWriteCommentClick = onWriteCommentClick,
-                        onFireClick = onFireClick,
-                        onHateClick = onHateClick,
+                        onFireClick = { onFireClick(snackbarHostState) },
+                        onHateClick = { onHateClick(snackbarHostState) },
                         onFavoriteClick = onFavoriteClick,
                         onToTopClick = {
                             contentController.scrollToTop()

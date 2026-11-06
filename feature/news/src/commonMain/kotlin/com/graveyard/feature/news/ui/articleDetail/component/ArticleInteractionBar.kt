@@ -2,6 +2,7 @@ package com.graveyard.feature.news.ui.articleDetail.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +30,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -56,6 +60,10 @@ internal fun ArticleInteractionBar(
     vote: ArticleVote,
     collected: Boolean,
     enabled: Boolean,
+    interactionEnabled: Boolean,
+    voteEnabled: Boolean,
+    isVoteCoolingDown: Boolean,
+    voteCooldownProgress: () -> Float,
     onCommentsClick: (() -> Unit)?,
     onWriteCommentClick: () -> Unit,
     onFireClick: () -> Unit,
@@ -66,6 +74,7 @@ internal fun ArticleInteractionBar(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val hateTint = LocalContentColor.current
     val replies = replyNum.ifEmpty { "0" }
     val likes = likeNum.ifEmpty { "0" }
     val liked = vote == ArticleVote.Like
@@ -121,24 +130,30 @@ internal fun ArticleInteractionBar(
                         count = likes,
                         label = stringResource(Res.string.article_fire_count, likes),
                         maxWidth = actionWidth,
-                        enabled = enabled,
+                        enabled = enabled && interactionEnabled && voteEnabled,
                         onClick = onFireClick,
                         tint = if (liked) colors.error else LocalContentColor.current,
                         selected = liked,
+                        voteCoolingDown = isVoteCoolingDown,
+                        cooldownProgress = voteCooldownProgress,
                     )
                     IconButton(
                         onClick = onHateClick,
-                        enabled = enabled,
+                        enabled = enabled && interactionEnabled && voteEnabled,
                         modifier = Modifier.size(48.dp).semantics { selected = hated },
                     ) {
-                        Icon(
-                            imageVector = (if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown).imageVector,
+                        VoteCooldownIcon(
+                            icon = if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown,
+                            isCoolingDown = isVoteCoolingDown,
+                            progress = voteCooldownProgress,
+                            activeTint = hateTint,
+                            disabledTint = hateTint.copy(alpha = hateTint.alpha * 0.38f),
                             contentDescription = stringResource(Res.string.article_hate),
                         )
                     }
                     IconButton(
                         onClick = onFavoriteClick,
-                        enabled = enabled,
+                        enabled = enabled && interactionEnabled,
                         modifier = Modifier.size(48.dp).semantics { selected = collected },
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = if (collected) colors.primary else LocalContentColor.current,
@@ -166,6 +181,8 @@ private fun CountAction(
     tint: Color = LocalContentColor.current,
     /** Non-null for toggle actions so accessibility services announce the current state. */
     selected: Boolean? = null,
+    voteCoolingDown: Boolean = false,
+    cooldownProgress: () -> Float = { 1f },
 ) {
     val iconColors = IconButtonDefaults.iconButtonColors(contentColor = tint)
     val actionModifier = Modifier
@@ -186,7 +203,14 @@ private fun CountAction(
             ),
             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
         ) {
-            CountActionContent(icon, count)
+            CountActionContent(
+                icon = icon,
+                count = count,
+                tint = iconColors.contentColor,
+                voteCoolingDown = voteCoolingDown,
+                cooldownProgress = cooldownProgress,
+                disabledTint = iconColors.disabledContentColor,
+            )
         }
     } else {
         Row(
@@ -194,25 +218,97 @@ private fun CountAction(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CountActionContent(icon, count, if (enabled) iconColors.contentColor else iconColors.disabledContentColor)
+            CountActionContent(
+                icon = icon,
+                count = count,
+                tint = if (enabled) iconColors.contentColor else iconColors.disabledContentColor,
+                countTint = if (enabled) iconColors.contentColor else iconColors.disabledContentColor,
+            )
         }
     }
 }
 
 @Composable
-private fun RowScope.CountActionContent(
+internal fun RowScope.CountActionContent(
     icon: AppIcon,
     count: String,
     tint: Color = LocalContentColor.current,
+    countTint: Color = LocalContentColor.current,
+    voteCoolingDown: Boolean = false,
+    cooldownProgress: () -> Float = { 1f },
+    activeTint: Color = tint,
+    disabledTint: Color = activeTint.copy(alpha = activeTint.alpha * 0.38f),
+) {
+    if (!voteCoolingDown) {
+        CountActionLabel(icon = icon, count = count, tint = tint, countTint = countTint)
+        return
+    }
+    Box(Modifier.weight(1f, fill = false)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CountActionLabel(icon = icon, count = count, tint = disabledTint, countTint = disabledTint)
+        }
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .clearAndSetSemantics {}
+                .voteCooldownReveal(cooldownProgress),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CountActionLabel(icon = icon, count = count, tint = activeTint, countTint = activeTint)
+        }
+    }
+}
+
+@Composable
+private fun RowScope.CountActionLabel(
+    icon: AppIcon,
+    count: String,
+    tint: Color,
+    countTint: Color,
 ) {
     Icon(icon.imageVector, null, Modifier.size(24.dp), tint = tint)
     Spacer(Modifier.width(4.dp))
     Text(
         text = count,
-        color = tint,
+        color = countTint,
         style = MaterialTheme.typography.labelMedium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
     )
+}
+
+@Composable
+internal fun VoteCooldownIcon(
+    icon: AppIcon,
+    isCoolingDown: Boolean,
+    progress: () -> Float,
+    activeTint: Color,
+    disabledTint: Color,
+    contentDescription: String? = null,
+    modifier: Modifier = Modifier.size(24.dp),
+) {
+    if (!isCoolingDown) {
+        Icon(icon.imageVector, contentDescription, modifier)
+        return
+    }
+    Box(modifier) {
+        Icon(icon.imageVector, contentDescription, Modifier.fillMaxSize(), tint = disabledTint)
+        Icon(
+            imageVector = icon.imageVector,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize().voteCooldownReveal(progress),
+            tint = activeTint,
+        )
+    }
+}
+
+// Read progress only during drawing so animation frames do not recompose or measure the content.
+private fun Modifier.voteCooldownReveal(progress: () -> Float): Modifier = drawWithContent {
+    val visibleFraction = progress().coerceIn(0f, 1f)
+    if (visibleFraction > 0f) {
+        clipRect(bottom = size.height * visibleFraction) {
+            this@drawWithContent.drawContent()
+        }
+    }
 }

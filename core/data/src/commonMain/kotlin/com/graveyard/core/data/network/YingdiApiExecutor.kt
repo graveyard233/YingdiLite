@@ -7,6 +7,7 @@ import com.graveyard.core.data.result.DataException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -31,17 +32,35 @@ internal class YingdiApiExecutor(
         serializer: KSerializer<T>,
         expectedArrayField: String? = null,
         allowNullArray: Boolean = false,
+    ): T = withRefreshedToken { token ->
+        send(path, form, token, serializer, expectedArrayField, allowNullArray)
+    }
+
+    /** token 过期（业务错误 200002）时刷新一次并重放；其余错误原样抛出，重放失败也不再刷新。 */
+    private suspend fun <T> withRefreshedToken(
+        expectedUserId: Long? = null,
+        block: suspend (String) -> T,
     ): T {
-        val token = settings.session.first()?.loginToken ?: "nologin"
+        val session = settings.session.first()
+        if (expectedUserId != null && session?.userId != expectedUserId) {
+            throw CancellationException("Authenticated request account changed")
+        }
+        val token = session?.loginToken ?: "nologin"
         return try {
-            send(path, form, token, serializer, expectedArrayField, allowNullArray)
+            block(token)
         } catch (exception: DataException) {
             if (token == "nologin" || (exception.error as? DataError.Business)?.retCode != "200002") {
                 throw exception
             }
+            if (expectedUserId != null && settings.session.first()?.userId != expectedUserId) {
+                throw CancellationException("Authenticated request account changed")
+            }
             val refreshed = refresher.refresh(token) ?: throw exception
+            if (expectedUserId != null && settings.session.first()?.userId != expectedUserId) {
+                throw CancellationException("Authenticated request account changed")
+            }
             // 此次发送的错误直接返回，不再进入刷新分支。
-            send(path, form, refreshed, serializer, expectedArrayField, allowNullArray)
+            block(refreshed)
         }
     }
 
@@ -55,4 +74,12 @@ internal class YingdiApiExecutor(
     ): T = client.post(YINGDI_API_BASE_URL + path) {
         setBody(form.withLoginToken(token))
     }.decodeYingdiResponse(json, serializer, expectedArrayField, allowNullArray)
+
+    /** 无响应体接口（例如收藏/取消收藏），成功时只校验状态。 */
+    suspend fun postNoContent(path: String, form: YingdiSignedForm, expectedUserId: Long? = null): Unit =
+        withRefreshedToken(expectedUserId) { token ->
+            client.post(YINGDI_API_BASE_URL + path) {
+                setBody(form.withLoginToken(token))
+            }.verifyYingdiResponse(json)
+        }
 }

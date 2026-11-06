@@ -63,6 +63,9 @@ internal val ArticleCommentsBottomBarHeight = 56.dp
 internal fun ArticleCommentsBottomBar(
     likeNum: String,
     vote: ArticleVote,
+    interactionEnabled: Boolean,
+    isVoteCoolingDown: Boolean,
+    voteCooldownProgress: () -> Float,
     commentOrder: ArticleCommentOrder,
     onOrderSelected: (ArticleCommentOrder) -> Unit,
     onToTopClick: () -> Unit,
@@ -75,6 +78,8 @@ internal fun ArticleCommentsBottomBar(
     val fireDescription = stringResource(Res.string.article_fire_count, fire)
     val liked = vote == ArticleVote.Like
     val hated = vote == ArticleVote.Hate
+    val fireTint = if (liked) MaterialTheme.colorScheme.error else LocalContentColor.current
+    val hateTint = LocalContentColor.current
     val interactive = scrollBehavior.state.collapsedFraction < 1f
     FlexibleBottomAppBar(
         modifier = Modifier.fillMaxWidth()
@@ -113,7 +118,7 @@ internal fun ArticleCommentsBottomBar(
                 ) {
                     TextButton(
                         onClick = onFireClick,
-                        enabled = interactive,
+                        enabled = interactive && interactionEnabled,
                         modifier = Modifier
                             .widthIn(min = 48.dp, max = actionWidth)
                             .heightIn(min = 48.dp)
@@ -123,31 +128,30 @@ internal fun ArticleCommentsBottomBar(
                             },
                         // TextButton defaults to primary; inactive fire matches the other bar icons.
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = if (liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                            contentColor = fireTint,
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                     ) {
-                        Icon(
-                            imageVector = (if (liked) AppIcon.FireFill else AppIcon.Fire).imageVector,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = fire,
-                            modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics {},
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        CountActionContent(
+                            icon = if (liked) AppIcon.FireFill else AppIcon.Fire,
+                            count = fire,
+                            voteCoolingDown = isVoteCoolingDown,
+                            cooldownProgress = voteCooldownProgress,
+                            activeTint = fireTint,
+                            disabledTint = fireTint.copy(alpha = fireTint.alpha * 0.38f),
                         )
                     }
                     IconButton(
                         onClick = onHateClick,
-                        enabled = interactive,
+                        enabled = interactive && interactionEnabled,
                         modifier = Modifier.size(48.dp).semantics { selected = hated },
                     ) {
-                        Icon(
-                            imageVector = (if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown).imageVector,
+                        VoteCooldownIcon(
+                            icon = if (hated) AppIcon.ThumbDownFill else AppIcon.ThumbDown,
+                            isCoolingDown = isVoteCoolingDown,
+                            progress = voteCooldownProgress,
+                            activeTint = hateTint,
+                            disabledTint = hateTint.copy(alpha = hateTint.alpha * 0.38f),
                             contentDescription = stringResource(Res.string.article_hate),
                         )
                     }

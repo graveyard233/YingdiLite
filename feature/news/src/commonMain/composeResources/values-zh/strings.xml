@@ -108,4 +108,12 @@
     <string name="article_replies_loading">正在加载回复</string>
     <string name="article_replies_empty">暂无可显示的回复</string>
     <string name="article_replies_refresh_failed">刷新失败，仍显示上次回复</string>
+    <string name="article_auth_like">登录后即可点赞</string>
+    <string name="article_auth_hate">登录后即可点踩</string>
+    <string name="article_auth_collect">登录后即可收藏</string>
+    <string name="article_already_liked">已经点赞了</string>
+    <string name="article_already_hated">已经点踩了</string>
+    <string name="article_interaction_sync_failed">暂时无法同步互动状态，请重试</string>
+    <string name="article_interaction_failed">操作失败，请重试</string>
+    <string name="article_interaction_saved_sync_failed">操作已成功，暂时无法同步最新数据</string>
 </resources>

@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,6 +54,7 @@ import com.graveyard.core.data.result.DataException
 import com.graveyard.core.designsystem.component.CommonList
 import com.graveyard.core.designsystem.icons.AppIcon
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleComment
 import com.graveyard.core.model.news.ArticleCommentThread
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentItem
 import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentsBottomBar
@@ -59,6 +62,7 @@ import com.graveyard.feature.news.ui.articleDetail.component.ArticleCommentsBott
 import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
 import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
 import com.graveyard.feature.news.viewmodel.ArticleCommentsUiState
+import com.graveyard.feature.news.viewmodel.CommentVoteUiState
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
@@ -85,13 +89,20 @@ internal fun ArticleCommentsPage(
     onBack: () -> Unit,
     vote: ArticleVote = ArticleVote.None,
     showBack: Boolean = true,
+    interactionEnabled: Boolean = true,
+    isVoteCoolingDown: Boolean = false,
+    voteCooldownProgress: () -> Float = { 1f },
+    onFireClick: (SnackbarHostState) -> Unit = {},
+    onHateClick: (SnackbarHostState) -> Unit = {},
     onLoadComments: () -> Unit,
     onOrderSelected: (ArticleCommentOrder) -> Unit,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
     onViewReplies: (commentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState> = emptyMap(),
+    snackbarHostState: SnackbarHostState,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val canScroll by remember(listState) {
@@ -119,6 +130,7 @@ internal fun ArticleCommentsPage(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             Box(
                 modifier = Modifier
@@ -130,6 +142,9 @@ internal fun ArticleCommentsPage(
                 ArticleCommentsBottomBar(
                     likeNum = likeNum,
                     vote = vote,
+                    interactionEnabled = interactionEnabled,
+                    isVoteCoolingDown = isVoteCoolingDown,
+                    voteCooldownProgress = voteCooldownProgress,
                     commentOrder = commentsState.order,
                     onOrderSelected = onOrderSelected,
                     onToTopClick = {
@@ -139,12 +154,8 @@ internal fun ArticleCommentsPage(
                             bottomBarScrollBehavior.state.contentOffset = 0f
                         }
                     },
-                    onFireClick = {
-                        // TODO: Connect the article heat action.
-                    },
-                    onHateClick = {
-                        // TODO: Connect the article hate action.
-                    },
+                    onFireClick = { onFireClick(snackbarHostState) },
+                    onHateClick = { onHateClick(snackbarHostState) },
                     scrollBehavior = bottomBarScrollBehavior,
                 )
             }
@@ -230,6 +241,7 @@ internal fun ArticleCommentsPage(
                             ArticleCommentItem(
                                 thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, onViewReplies,
                                 showDivider = !showSectionBreak || thread.mainComment.id != hotComments.last().mainComment.id,
+                                voteStates = voteStates,
                             )
                         }
                         if (normalCount > 0) {
@@ -288,7 +300,7 @@ internal fun ArticleCommentsPage(
                                     comments[index]
                                 }
                                 commentsSnapshot.items.getOrNull(index)?.let { thread ->
-                                    ArticleCommentItem(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, onViewReplies)
+                                    ArticleCommentItem(thread, onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, onViewReplies, voteStates = voteStates)
                                 }
                             }
                         }

@@ -39,6 +39,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +69,7 @@ import com.graveyard.feature.news.ui.articleDetail.component.ArticleThreadCommen
 import com.graveyard.feature.news.ui.newsList.component.NewsErrorState
 import com.graveyard.feature.news.ui.newsList.component.newsErrorMessage
 import com.graveyard.feature.news.viewmodel.ArticleRepliesUiState
+import com.graveyard.feature.news.viewmodel.CommentVoteUiState
 import org.jetbrains.compose.resources.stringResource
 import yingdilite.feature.news.generated.resources.Res
 import yingdilite.feature.news.generated.resources.article_comment_reply
@@ -94,9 +97,11 @@ internal fun ArticleRepliesPage(
     onLoad: () -> Unit,
     onOrderSelected: (ArticleReplyOrder) -> Unit,
     onImageClick: (urls: List<String>, index: Int) -> Unit,
-    onLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    voteStates: Map<Long, CommentVoteUiState> = emptyMap(),
+    snackbarHostState: SnackbarHostState,
 ) {
     val root = state.metadata?.mainComment
     val snapshot = replies.itemSnapshotList
@@ -112,6 +117,7 @@ internal fun ArticleRepliesPage(
     val retry = { if (state.feed == null) onLoad() else replies.retry() }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -151,7 +157,7 @@ internal fun ArticleRepliesPage(
                         item(key = "root", contentType = "root") {
                             ArticleThreadCommentItem(
                                 root, root.id, state.metadata?.isManager == true, true,
-                                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked,
+                                onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates,
                             )
                         }
                         item(key = "reply-heading", contentType = "heading") {
@@ -191,7 +197,7 @@ internal fun ArticleRepliesPage(
                             snapshot.items.getOrNull(index)?.let { reply ->
                                 ArticleThreadCommentItem(
                                     reply, commentId, false, false,
-                                    onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked,
+                                    onImageClick, onLikeClicked, onDislikeClicked, onMoreClicked, voteStates,
                                 )
                             }
                         }

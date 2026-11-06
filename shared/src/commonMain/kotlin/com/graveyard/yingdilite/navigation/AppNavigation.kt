@@ -52,6 +52,11 @@ import com.graveyard.core.designsystem.media.imageGalleryDialogProperties
 import com.graveyard.core.designsystem.navigation.Navigator
 import com.graveyard.core.designsystem.navigation.rememberNavigationState
 import com.graveyard.core.designsystem.navigation.toEntries
+import com.graveyard.core.designsystem.navigation.auth.AuthContinuation
+import com.graveyard.core.designsystem.navigation.auth.AuthFlowState
+import com.graveyard.core.designsystem.navigation.auth.AuthRequest
+import com.graveyard.core.designsystem.navigation.auth.AuthRequiredDialog
+import com.graveyard.core.designsystem.navigation.auth.rememberAuthFlowState
 import com.graveyard.core.data.auth.AuthState
 import com.graveyard.core.data.repository.AuthRepository
 import com.graveyard.feature.cards.navigation.CardsChildRoute
@@ -70,18 +75,22 @@ import com.graveyard.feature.mine.ui.login.screen.MineLoginRouteScreen
 import com.graveyard.feature.mine.ui.effect.MineLoginFeedback
 import com.graveyard.feature.mine.ui.mine.screen.MineRouteScreen
 import com.graveyard.feature.news.navigation.ArticleRoute
+import com.graveyard.feature.news.navigation.ArticleAuthAction
 import com.graveyard.feature.news.navigation.ArticleRepliesRoute
 import com.graveyard.feature.news.navigation.NewsRoute
 import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRouteScreen
 import com.graveyard.feature.news.ui.articleDetail.screen.ArticleRepliesRouteScreen
 import com.graveyard.feature.news.ui.newsList.screen.NewsRouteScreen
-import com.graveyard.yingdilite.navigation.mine.closeMineAgreement
-import com.graveyard.yingdilite.navigation.mine.createMineSceneStrategy
-import com.graveyard.yingdilite.navigation.mine.isMineAgreementPaneChange
-import com.graveyard.yingdilite.navigation.mine.openMineAgreement
-import com.graveyard.yingdilite.navigation.mine.openMineLogin
-import com.graveyard.yingdilite.navigation.mine.returnToMineProfile
-import com.graveyard.yingdilite.navigation.mine.finishMineLogin
+import com.graveyard.yingdilite.navigation.auth.LoginRoute
+import com.graveyard.yingdilite.navigation.auth.LoginAgreementRoute
+import com.graveyard.yingdilite.navigation.auth.closeLogin
+import com.graveyard.yingdilite.navigation.auth.closeLoginAgreement
+import com.graveyard.yingdilite.navigation.auth.createAuthSceneStrategy
+import com.graveyard.yingdilite.navigation.auth.finishLogin
+import com.graveyard.yingdilite.navigation.auth.isLoginAgreementPaneChange
+import com.graveyard.yingdilite.navigation.auth.normaliseLegacyLogin
+import com.graveyard.yingdilite.navigation.auth.openLogin
+import com.graveyard.yingdilite.navigation.auth.openLoginAgreement
 import org.koin.compose.koinInject
 import com.graveyard.yingdilite.navigation.news.NewsSceneStrategy
 import com.graveyard.yingdilite.navigation.news.calculateNewsLayout
@@ -94,6 +103,8 @@ import com.graveyard.yingdilite.navigation.news.isRepliesPaneChange
 import com.graveyard.yingdilite.navigation.news.selectArticle
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.json.Json
+import kotlin.uuid.Uuid
 
 private val topLevelDestinations = listOf(
     TopLevelDestination(NewsRoute, "新闻", icon = AppIcon.News, selectedIcon = AppIcon.NewsFill),
@@ -109,6 +120,8 @@ private val hiddenNavigationRouteTypes = listOf(
     CardsChildRoute::class,
     MineLoginRoute::class,
     MineAgreementRoute::class,
+    LoginRoute::class,
+    LoginAgreementRoute::class,
     ArticleRoute::class,
     ArticleRepliesRoute::class,
     ImageGalleryRoute::class,
@@ -120,25 +133,35 @@ private val hiddenNavigationRouteTypes = listOf(
 fun AppNavigation(
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
-    val configuration = remember {
-        SavedStateConfiguration {
-            serializersModule = SerializersModule {
-                polymorphic(NavKey::class) {
-                    subclass(NewsRoute::class, NewsRoute.serializer())
-                    subclass(ArticleRoute::class, ArticleRoute.serializer())
-                    subclass(ArticleRepliesRoute::class, ArticleRepliesRoute.serializer())
-                    subclass(ImageGalleryRoute::class, ImageGalleryRoute.serializer())
-                    subclass(CommunityRoute::class, CommunityRoute.serializer())
-                    subclass(CommunityChildRoute::class, CommunityChildRoute.serializer())
-                    subclass(CardsRoute::class, CardsRoute.serializer())
-                    subclass(CardsChildRoute::class, CardsChildRoute.serializer())
-                    subclass(MineRoute::class, MineRoute.serializer())
-                    subclass(MineLoginRoute::class, MineLoginRoute.serializer())
-                    subclass(MineAgreementRoute::class, MineAgreementRoute.serializer())
-                }
+    val navigationSerializers = remember {
+        SerializersModule {
+            polymorphic(NavKey::class) {
+                subclass(NewsRoute::class, NewsRoute.serializer())
+                subclass(ArticleRoute::class, ArticleRoute.serializer())
+                subclass(ArticleRepliesRoute::class, ArticleRepliesRoute.serializer())
+                subclass(ImageGalleryRoute::class, ImageGalleryRoute.serializer())
+                subclass(CommunityRoute::class, CommunityRoute.serializer())
+                subclass(CommunityChildRoute::class, CommunityChildRoute.serializer())
+                subclass(CardsRoute::class, CardsRoute.serializer())
+                subclass(CardsChildRoute::class, CardsChildRoute.serializer())
+                subclass(MineRoute::class, MineRoute.serializer())
+                subclass(MineLoginRoute::class, MineLoginRoute.serializer())
+                subclass(MineAgreementRoute::class, MineAgreementRoute.serializer())
+                subclass(LoginRoute::class, LoginRoute.serializer())
+                subclass(LoginAgreementRoute::class, LoginAgreementRoute.serializer())
+            }
+            polymorphic(AuthContinuation::class) {
+                subclass(ArticleAuthAction.SetVote::class, ArticleAuthAction.SetVote.serializer())
+                subclass(ArticleAuthAction.SetCollected::class, ArticleAuthAction.SetCollected.serializer())
+                subclass(ArticleAuthAction.SetCommentVote::class, ArticleAuthAction.SetCommentVote.serializer())
             }
         }
     }
+    val configuration = remember(navigationSerializers) {
+        SavedStateConfiguration { serializersModule = navigationSerializers }
+    }
+    val authJson = remember(navigationSerializers) { Json { serializersModule = navigationSerializers } }
+    val authFlow = rememberAuthFlowState(authJson)
 
     val navigationState = rememberNavigationState(
         configuration = configuration,
@@ -150,9 +173,16 @@ fun AppNavigation(
     val navigator = remember(navigationState) { Navigator(navigationState) }
     val authRepository = koinInject<AuthRepository>()
     val authState by authRepository.state.collectAsState()
-    val mineStack = navigationState.subStacks.getValue(MineRoute).toList()
-    LaunchedEffect(authState is AuthState.Authenticated, mineStack) {
-        if (authRepository.state.value is AuthState.Authenticated) navigator.finishMineLogin()
+    val stacks = navigationState.subStacks.mapValues { it.value.toList() }
+    LaunchedEffect(authState, stacks) {
+        navigator.normaliseLegacyLogin()
+        val currentAuth = authRepository.state.value
+        authFlow.retainValid(
+            stacks = navigationState.subStacks.mapValues { it.value.toList() },
+            userId = (currentAuth as? AuthState.Authenticated)?.userId,
+            restoring = currentAuth == AuthState.Restoring,
+        )
+        if (currentAuth is AuthState.Authenticated) navigator.finishLogin(currentAuth.userId, authFlow)
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val galleryStrategy = remember { DialogSceneStrategy<NavKey>() }
@@ -201,14 +231,30 @@ fun AppNavigation(
             ) {
                 // 离场场景仍可能可见，但不能继续触发页面操作；弹层下的条目也可能暂时不可交互。
                 // 按场景和条目集合共同判断，保留宽屏下多个 pane 同时交互的能力。
-                val interactive = LocalSceneInteractive.current && key in currentTargetPresentation.interactiveEntryKeys
+                val interactive = LocalSceneInteractive.current && key in currentTargetPresentation.interactiveEntryKeys &&
+                    authFlow.snapshot.prompt == null
                 AppNavEntry(
                     key = key,
                     navigator = navigator,
                     authRepository = authRepository,
+                    authState = authState,
+                    authFlow = authFlow,
                     interactive = interactive,
+                    canInteractNow = {
+                        key in navigationState.currentSubStack && key in currentTargetPresentation.interactiveEntryKeys &&
+                            authFlow.snapshot.prompt == null
+                    },
+                    onRequireLogin = { continuation, message ->
+                        if (interactive && key in navigationState.currentSubStack &&
+                            key in currentTargetPresentation.interactiveEntryKeys && authFlow.snapshot.prompt == null) {
+                            authFlow.showPrompt(
+                                AuthRequest(Uuid.random().toString(), navigationState.currentTopLevelKey, key, continuation),
+                                message,
+                            )
+                        }
+                    },
                     onShowMessage = { message ->
-                        if (key in currentTargetPresentation.interactiveEntryKeys) {
+                        if (key in navigationState.currentSubStack && key in currentTargetPresentation.interactiveEntryKeys) {
                             snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Short)
                         }
                     },
@@ -257,7 +303,7 @@ fun AppNavigation(
                 calculateNewsSingleLayout(maxWidth.value, maxHeight.value, vertical, horizontal)
             }
             val newsStrategy = NewsSceneStrategy(feedLayout, readingLayout)
-            val mineStrategy = createMineSceneStrategy(
+            val authStrategy = createAuthSceneStrategy(
                 width = maxWidth.value,
                 height = maxHeight.value,
                 navigationWidth = reservedRailWidth,
@@ -267,7 +313,7 @@ fun AppNavigation(
                 horizontalHinges = horizontal,
             )
             val underlyingEntries = if (gallery != null) entries.dropLast(1) else entries
-            val targetScene = mineStrategy.createScene(underlyingEntries)
+            val targetScene = authStrategy.createScene(underlyingEntries)
                 ?: newsStrategy.createScene(underlyingEntries)
             val basePresentation = targetScene?.let(::scenePresentation) ?: AppScenePresentation(
                 showsApplicationNavigation = navigationState.currentKey.hasAppNavigation(),
@@ -283,10 +329,9 @@ fun AppNavigation(
                 snackbarHostState.currentSnackbarData?.dismiss()
             }
             MineLoginFeedback(
-                active = navigationState.currentTopLevelKey == MineRoute &&
-                    resolvedPresentation.interactiveEntryKeys.any {
-                        it == MineRoute || it == MineLoginRoute || it is MineAgreementRoute
-                    },
+                active = resolvedPresentation.interactiveEntryKeys.any {
+                    it == MineRoute || it is LoginRoute || it is LoginAgreementRoute
+                },
                 onShowMessage = { snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short) },
             )
             SharedTransitionLayout(Modifier.fillMaxSize()) {
@@ -300,7 +345,9 @@ fun AppNavigation(
                             currentKey = navigationState.currentTopLevelKey,
                             destinations = topLevelDestinations,
                             onNavigate = { destination ->
-                                if (navigationState.currentKey !is ImageGalleryRoute) navigator.navigate(destination)
+                                if (navigationState.currentKey !is ImageGalleryRoute && authFlow.snapshot.prompt == null) {
+                                    navigator.navigate(destination)
+                                }
                             },
                             layoutType = layoutType,
                         )
@@ -313,10 +360,10 @@ fun AppNavigation(
                     onBack = ::handleBack,
                     modifier = Modifier.fillMaxSize(),
                     sceneDecoratorStrategies = listOf(navigationSceneDecorator),
-                    sceneStrategies = listOf(galleryStrategy, mineStrategy, newsStrategy),
+                    sceneStrategies = listOf(galleryStrategy, authStrategy, newsStrategy),
                     sharedTransitionScope = this,
                     transitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isLoginAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { it },
@@ -327,7 +374,7 @@ fun AppNavigation(
                         )
                     },
                     popTransitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isLoginAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { -it },
@@ -338,7 +385,7 @@ fun AppNavigation(
                         )
                     },
                     predictivePopTransitionSpec = {
-                        if (isRepliesPaneChange(initialState, targetState) || isMineAgreementPaneChange(initialState, targetState)) {
+                        if (isRepliesPaneChange(initialState, targetState) || isLoginAgreementPaneChange(initialState, targetState)) {
                             EnterTransition.None togetherWith ExitTransition.None
                         } else slideInHorizontally(
                             initialOffsetX = { -it },
@@ -347,6 +394,32 @@ fun AppNavigation(
                             targetOffsetX = { it },
                             animationSpec = tween(NAVIGATION_TRANSITION_DURATION_MILLIS),
                         )
+                    },
+                )
+            }
+            authFlow.snapshot.prompt?.let { prompt ->
+                AuthRequiredDialog(
+                    message = prompt.message,
+                    onDismiss = authFlow::dismissPrompt,
+                    onConfirm = {
+                        // Ignore callbacks from a dismissed dialog and recheck both source and session.
+                        if (authFlow.snapshot.prompt == prompt) {
+                            val request = prompt.request
+                            val valid = navigationState.currentTopLevelKey == request.ownerTabKey &&
+                                request.sourceEntryKey in navigationState.currentSubStack &&
+                                request.sourceEntryKey in currentTargetPresentation.interactiveEntryKeys
+                            if (valid) when (val currentAuth = authRepository.state.value) {
+                                is AuthState.Authenticated -> {
+                                    authFlow.deliver(request, currentAuth.userId)
+                                    authFlow.dismissPrompt()
+                                }
+                                AuthState.Guest -> {
+                                    authFlow.dismissPrompt()
+                                    navigator.openLogin(currentAuth, request)
+                                }
+                                AuthState.Restoring -> Unit
+                            } else authFlow.dismissPrompt()
+                        }
                     },
                 )
             }
@@ -367,7 +440,11 @@ private fun AppNavEntry(
     key: NavKey,
     navigator: Navigator,
     authRepository: AuthRepository,
+    authState: AuthState,
+    authFlow: AuthFlowState,
     interactive: Boolean,
+    canInteractNow: () -> Boolean,
+    onRequireLogin: (AuthContinuation, String) -> Unit,
     onShowMessage: suspend (String) -> Unit,
 ) {
     when (key) {
@@ -391,6 +468,15 @@ private fun AppNavEntry(
                 articleTitle = key.articleTitle,
                 replyNum = key.replyNum,
                 likeNum = key.likeNum,
+                authState = authState,
+                authResult = authFlow.resultFor(navigator.state.currentTopLevelKey, key),
+                onTakeAuthResult = { result ->
+                    val userId = (authRepository.state.value as? AuthState.Authenticated)?.userId
+                    if (interactive && canInteractNow() && userId != null) {
+                        authFlow.take(result.request.requestId, navigator.state.currentTopLevelKey, key, userId)
+                    } else null
+                },
+                onRequireLogin = onRequireLogin,
                 onBack = { if (interactive && navigator.canInteractWithArticle(key)) navigator.goBack() },
                 onImageClick = { urls, index ->
                     if (interactive) navigator.openImages(urls, index, source = key)
@@ -407,7 +493,17 @@ private fun AppNavEntry(
             LocalNewsPresentation provides LocalNewsPresentation.current.copy(interactive = interactive),
         ) {
             ArticleRepliesRouteScreen(
+                articleId = key.article.articleId,
                 commentId = key.commentId,
+                authState = authState,
+                authResult = authFlow.resultFor(navigator.state.currentTopLevelKey, key),
+                onTakeAuthResult = { result ->
+                    val userId = (authRepository.state.value as? AuthState.Authenticated)?.userId
+                    if (interactive && canInteractNow() && userId != null) {
+                        authFlow.take(result.request.requestId, navigator.state.currentTopLevelKey, key, userId)
+                    } else null
+                },
+                onRequireLogin = onRequireLogin,
                 onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
                 onImageClick = { urls, index ->
                     if (interactive) navigator.openImages(urls, index, source = key)
@@ -435,18 +531,20 @@ private fun AppNavEntry(
             onBack = { if (interactive && navigator.state.currentKey == key) navigator.goBack() },
         )
         MineRoute -> MineRouteScreen(
-            onOpenLogin = { if (interactive) navigator.openMineLogin(authRepository.state.value) },
+            onOpenLogin = { if (interactive) navigator.openLogin(authRepository.state.value) },
             onShowMessage = onShowMessage,
         )
-        MineLoginRoute -> MineLoginRouteScreen(
+        is LoginRoute -> MineLoginRouteScreen(
             interactive = interactive,
-            onBack = { if (interactive) navigator.returnToMineProfile() },
-            onOpenAgreement = { if (interactive) navigator.openMineAgreement(it) },
+            onBack = { if (interactive) navigator.closeLogin(key) },
+            onOpenAgreement = { if (interactive) navigator.openLoginAgreement(key, it) },
         )
-        is MineAgreementRoute -> MineAgreementScreen(
+        is LoginAgreementRoute -> MineAgreementScreen(
             agreement = key.agreement,
-            onBack = { if (interactive) navigator.closeMineAgreement(key) },
+            onBack = { if (interactive) navigator.closeLoginAgreement(key) },
         )
+        // Legacy saved keys are normalised by the host before accepting interactions.
+        MineLoginRoute, is MineAgreementRoute -> Unit
         else -> error("Unknown navigation key: $key")
     }
 }

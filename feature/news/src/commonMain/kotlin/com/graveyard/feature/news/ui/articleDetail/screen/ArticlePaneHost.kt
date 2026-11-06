@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,11 +28,13 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.graveyard.core.data.repository.ArticleVote
 import com.graveyard.core.designsystem.webview.RichContentReadingState
 import com.graveyard.core.model.news.ArticleCommentOrder
+import com.graveyard.core.model.news.ArticleComment
 import com.graveyard.core.model.news.ArticleCommentThread
 import com.graveyard.feature.news.navigation.NewsLayoutMode
 import com.graveyard.feature.news.navigation.NewsPresentation
 import com.graveyard.feature.news.viewmodel.ArticleCommentsUiState
 import com.graveyard.feature.news.viewmodel.ArticleUiState
+import com.graveyard.feature.news.viewmodel.CommentVoteUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -56,15 +59,22 @@ internal fun ArticlePaneHost(
     likeNum: String = "",
     vote: ArticleVote = ArticleVote.None,
     collected: Boolean = false,
+    interactionEnabled: Boolean = true,
+    voteEnabled: Boolean = true,
+    isVoteCoolingDown: Boolean = false,
+    voteCooldownProgress: () -> Float = { 1f },
     onWriteCommentClick: () -> Unit = {},
-    onFireClick: () -> Unit = {},
-    onHateClick: () -> Unit = {},
+    onFireClick: (SnackbarHostState) -> Unit = {},
+    onHateClick: (SnackbarHostState) -> Unit = {},
     onFavoriteClick: () -> Unit = {},
     onLoadComments: () -> Unit,
     onCommentOrderSelected: (ArticleCommentOrder) -> Unit,
-    onCommentLikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
-    onCommentDislikeClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    onCommentLikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
+    onCommentDislikeClicked: (comment: ArticleComment, parentCommentId: Long) -> Unit,
     onCommentMoreClicked: (commentId: Long, parentCommentId: Long) -> Unit,
+    commentVoteStates: Map<Long, CommentVoteUiState> = emptyMap(),
+    articleSnackbarHostState: SnackbarHostState,
+    commentsSnackbarHostState: SnackbarHostState,
 ) {
     // Keep the presenter and scroll position outside the single/dual-pane branches.
     val commentsFlow: Flow<PagingData<ArticleCommentThread>> = remember(commentsState.feed) {
@@ -189,12 +199,17 @@ internal fun ArticlePaneHost(
                             likeNum = likeNum,
                             vote = vote,
                             collected = collected,
+                            interactionEnabled = interactionEnabled,
+                            voteEnabled = voteEnabled,
+                            isVoteCoolingDown = isVoteCoolingDown,
+                            voteCooldownProgress = voteCooldownProgress,
                             onWriteCommentClick = onWriteCommentClick,
                             onFireClick = onFireClick,
                             onHateClick = onHateClick,
                             onFavoriteClick = onFavoriteClick,
                             contentVisible = presentation.interactive,
                             closeSelection = presentation.layoutMode == NewsLayoutMode.ReadingTriple,
+                            snackbarHostState = articleSnackbarHostState,
                         )
                     }
                 }
@@ -208,6 +223,11 @@ internal fun ArticlePaneHost(
                             vote = vote,
                             onBack = ::handleBack,
                             showBack = false,
+                            interactionEnabled = voteEnabled,
+                            isVoteCoolingDown = isVoteCoolingDown,
+                            voteCooldownProgress = voteCooldownProgress,
+                            onFireClick = onFireClick,
+                            onHateClick = onHateClick,
                             onLoadComments = onLoadComments,
                             onOrderSelected = onCommentOrderSelected,
                             onImageClick = onImageClick,
@@ -215,6 +235,8 @@ internal fun ArticlePaneHost(
                             onDislikeClicked = onCommentDislikeClicked,
                             onMoreClicked = onCommentMoreClicked,
                             onViewReplies = ::openReplies,
+                            voteStates = commentVoteStates,
+                            snackbarHostState = commentsSnackbarHostState,
                         )
                     }
                 }
@@ -250,6 +272,10 @@ internal fun ArticlePaneHost(
                     likeNum = likeNum,
                     vote = vote,
                     collected = collected,
+                    interactionEnabled = interactionEnabled,
+                    voteEnabled = voteEnabled,
+                    isVoteCoolingDown = isVoteCoolingDown,
+                    voteCooldownProgress = voteCooldownProgress,
                     onWriteCommentClick = onWriteCommentClick,
                     onFireClick = onFireClick,
                     onHateClick = onHateClick,
@@ -259,6 +285,7 @@ internal fun ArticlePaneHost(
                             coroutineScope.launch { pagerState.animateScrollToPage(COMMENTS_PAGE) }
                         }
                     },
+                    snackbarHostState = articleSnackbarHostState,
                 )
 
                 COMMENTS_PAGE -> ArticleCommentsPage(
@@ -268,6 +295,11 @@ internal fun ArticlePaneHost(
                     likeNum = likeNum,
                     vote = vote,
                     onBack = ::handleBack,
+                    interactionEnabled = voteEnabled,
+                    isVoteCoolingDown = isVoteCoolingDown,
+                    voteCooldownProgress = voteCooldownProgress,
+                    onFireClick = onFireClick,
+                    onHateClick = onHateClick,
                     onLoadComments = onLoadComments,
                     onOrderSelected = onCommentOrderSelected,
                     onImageClick = onImageClick,
@@ -275,6 +307,8 @@ internal fun ArticlePaneHost(
                     onDislikeClicked = onCommentDislikeClicked,
                     onMoreClicked = onCommentMoreClicked,
                     onViewReplies = ::openReplies,
+                    voteStates = commentVoteStates,
+                    snackbarHostState = commentsSnackbarHostState,
                 )
             }
         }

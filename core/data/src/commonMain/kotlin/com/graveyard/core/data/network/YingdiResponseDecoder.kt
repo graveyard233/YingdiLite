@@ -66,3 +66,32 @@ internal suspend fun <T> HttpResponse.decodeYingdiResponse(
         json.decodeFromJsonElement(serializer, payload)
     }
 }
+
+/**
+ * 无响应体接口的校验：成功时只检查 HTTP 状态，不反序列化 body。
+ *
+ * 服务端如果仍返回 `retCode` / `retMsg` 信封（例如 token 过期的 200002），
+ * 照样抛业务错误，让执行器复用刷新 token 的逻辑；非 JSON 且非 2xx 的错误响应按 HTTP 错误处理。
+ */
+internal suspend fun HttpResponse.verifyYingdiResponse(json: Json) {
+    val body = bodyAsText()
+    currentCoroutineContext().ensureActive()
+    withContext(Dispatchers.Default) {
+        val payload = try {
+            if (body.isBlank()) null else json.parseToJsonElement(body)
+        } catch (exception: SerializationException) {
+            if (!status.isSuccess()) throw DataException(DataError.Http(status.value))
+            null
+        }
+        if (payload is JsonObject && ("retCode" in payload || "retMsg" in payload)) {
+            throw DataException(
+                DataError.Business(
+                    (payload["retCode"] as? JsonPrimitive)?.contentOrNull,
+                    (payload["retMsg"] as? JsonPrimitive)?.contentOrNull,
+                ),
+            )
+        }
+        if (!status.isSuccess()) throw DataException(DataError.Http(status.value))
+        currentCoroutineContext().ensureActive()
+    }
+}

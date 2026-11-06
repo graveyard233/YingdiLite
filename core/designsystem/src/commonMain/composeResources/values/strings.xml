@@ -5,4 +5,7 @@
     <string name="image_gallery_close">Close image</string>
     <string name="image_gallery_download">Download image</string>
     <string name="image_gallery_load_failed">Couldn't load image</string>
+    <string name="auth_required_title">Sign in to continue</string>
+    <string name="auth_go_to_login">Sign in</string>
+    <string name="auth_cancel">Cancel</string>
 </resources>
